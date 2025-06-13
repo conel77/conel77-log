@@ -42,7 +42,7 @@ NLL 문제를 해결하려고 하는 다양한 논문들이 있었는데, 이런
 2. 근데 이런식으로 거르면 결국에 걸러진 데이터가 noisy 낀 데이터 (기존) 것과 비슷해질 수 밖에 없다. source data인 자기자신만 보고 update를 하기 때문에 (이게 label correction with self-prediction이라고 함)
 3. 따라서 target domain 관점에서 ideal label 을 만드는 작업을 채택하였다. ($g_c()$ 가  바로 그 모델임)
 
-![image.png](/workspace/conel77-log/public/static/images/semi-supervised-da/image.png)
+![image.png](/static/images/semi-supervised-da/image.png)
 
 그렇다면 이 라벨의 확률분포 결과를 내뱉는 모델 $g_c()$ 를 어떤 방식으로 정의할 것인가?
 
@@ -52,7 +52,7 @@ NLL 문제를 해결하려고 하는 다양한 논문들이 있었는데, 이런
 
 이 모델은 Protonet with Pseudo Centers 를 사용하여 few shot labeling 된 타겟 이미지가 있었을 때 overfitting 되는 문제를 해결하고자 하였다. 
 
-![image.png](/workspace/conel77-log/public/static/images/semi-supervised-da/image 1.png)
+![image.png](/static/images/semi-supervised-da/image1.png)
 
 **$c_k$ 는 Target domain의 unlabeled data**로부터 만들어진 클래스별 중심(Prototype)
 
@@ -67,7 +67,7 @@ center = [t_feat[label == i].mean(dim=0) for i in range(num_classes)]
 - 여기서 `t_loader`는 **target domain의 validation or unlabeled test loader**
 - 따라서 `self.center`는 **target domain feature space** 기준의 중심
 
-![image.png](/workspace/conel77-log/public/static/images/semi-supervised-da/image 2.png)
+![image.png](/static/images/semi-supervised-da/image2.png)
 
 입력 `x`는 일반적으로 **source domain의 feature** (학습용 데이터)로,  이 `x`와 **target 도메인의 중심 (`self.center`) 간 거리**를 바탕으로 soft label 생성한다.
 
@@ -82,7 +82,7 @@ soft_label = F.softmax(-dist * T, dim=1)
 
 즉, self.center는 target feature 공간에서 각 클래스의 평균 벡터 (prototype)가 되는거고, soft label(prototype network 의 output) 은 클래스별 확률을 가지는 것!
 
-![image.png](/workspace/conel77-log/public/static/images/semi-supervised-da/image 3.png)
+![image.png](/static/images/semi-supervised-da/image3.png)
 
 최종 소스에 대한 업데이트 되는 라벨 식을 보면, 알파 값을 통해 hard label(원핫인코딩) 과 soft label(확률분포)간의 비율을 조정해주고, prototype network 는 unlabeled 된 target data 를 self.center로 두어 source data 가 들어갔을 때 뱉는 soft label 이라고 보면 된다.
 

@@ -9,7 +9,7 @@ const projectsData: Project[] = [
   {
     title: 'Anomaly Image Generation with Diffusion and Adapter',
     description: `To address the data scarcity and out-of-distribution issues in anomaly detection, we proposed a novel image generation method combining DreamBooth and Text-to-Image Adapter. By conditioning on anomaly masks, our model enables diffusion-based generation of realistic anomaly images. A reconstruction loss was added to ensure quality and consistency. This method outperformed SOTA models on AUROC, AP, IS, and IC-LPIPS, and was published in IEEE ACCESS.`,
-    imgSrc: '/static/images/anomalygeneration.png', 
+    imgSrc: '/static/images/anodapter.png', 
     href: 'https://ieeexplore.ieee.org/abstract/document/11000123', 
   },
   {

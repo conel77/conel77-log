@@ -231,7 +231,7 @@ con_loss = F.mse_loss(prob1, prob2)
 
 ---
 
-## 📐 최종 CDAC 손실 함수
+## 최종 CDAC 손실 함수
 
 ```python
 return aac_loss + pl_loss + w_cons * con_loss
@@ -244,7 +244,7 @@ return aac_loss + pl_loss + w_cons * con_loss
 
 ---
 
-## 🔍 1. Hard Label vs. Soft Label
+## 1. Hard Label vs. Soft Label
 
 | 구분 | 정의 | 예시 (C=3) | 설명 |
 | --- | --- | --- | --- |
@@ -253,7 +253,7 @@ return aac_loss + pl_loss + w_cons * con_loss
 
 ---
 
-## 🔍 2. 왜 "soft-label"을 쓰는가?
+## 2. 왜 "soft-label"을 쓸까?
 
 특히 **semi-supervised learning**, **domain adaptation**, **knowledge distillation**, **SLA (Soft Label Adaptation)** 같은 상황에서는:
 

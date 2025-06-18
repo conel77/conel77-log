@@ -1,7 +1,7 @@
 import Image from './Image'
 import Link from './Link'
 
-const Card = ({ title, description, imgSrc, href }) => (
+const Card = ({ title, description, imgSrc, href, linkText }) => (
   <div className="md max-w-[544px] p-4 md:w-1/2">
     <div
       className={`${
@@ -45,7 +45,7 @@ const Card = ({ title, description, imgSrc, href }) => (
             className="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 text-base leading-6 font-medium"
             aria-label={`Link to ${title}`}
           >
-            Learn more &rarr;
+            {linkText ?? 'Learn more'} &rarr;
           </Link>
         )}
       </div>

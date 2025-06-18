@@ -13,6 +13,13 @@ const projectsData: Project[] = [
     href: 'https://ieeexplore.ieee.org/abstract/document/11000123', 
   },
   {
+    title: 'Industrial Anomaly Image Generation with User-Specified Masks',
+    description: `In collaboration with ANI, we developed a generative model to synthesize large-scale anomaly images from limited industrial datasets. By conditioning on user-specified masks, our model combines StyleGAN with SPADE to generate anomalies that precisely match mask regions. We also implemented an auto-mask generation module using object position priors for consistency and automation. The proposed model achieved a 1.8% improvement in IS and 10% gain in IC-LPIPS over standard GANs, while maintaining performance under limited memory. Applied to real-world datasets such as display defect and dental amalgam (teeth), the model demonstrated strong performance in industrial anomaly detection tasks. A diffusion-based variant is currently under training.`,
+    imgSrc: '/static/images/anomaly-gen.png',
+    href: 'https://www.anieng.com/',
+  }
+
+  {
     title: 'AI Driving Assistant for Beginner Drivers',
     description: `Developed a vision-based driving assistant system to help beginner drivers better perceive road conditions. Using dashcam footage from Honda Research Institute, we built a YOLO-based object detection model and a custom distance estimation module based on vehicle centroid height. The system distinguishes road/sidewalk regions, detects nearby hazards within 15 meters, and provides voice alerts. A navigation-integrated web app was also developed. The project won the Capstone Design Grand Prize and resulted in a published paper.`,
     imgSrc: '/static/images/aidriver.png', 

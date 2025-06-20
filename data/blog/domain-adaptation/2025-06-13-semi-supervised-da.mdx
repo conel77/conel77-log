@@ -8,19 +8,19 @@ summary: "Noisy label 문제를 해결하는 관점에서 Semi-Supervised Domain
 
 # Semi-Supervised Domain Adaptation with Source Label Adaptation
 
-Semi Supervised Domain Adaptation 의 전제조건 : 보지 못한 target data와 몇장의 라벨링된 데이터를 다량의 target domain 과 비슷한 결의 source data를 사용해서 classification 하는 작업
+Semi Supervised Domain Adaptation 의 전제조건 : 보지 못한 target data와 몇장의 라벨링된 데이터를 다량의 target domain 과 비슷한 결의 source data를 사용해서 classification 하는 작업이다.
 
-기존의 작업들은 소스 데이터에 noise 가 껴서 label 이 잘못되어있거나, target data와 match 가 안된다는 문제점을 지니고 있음 → 따라서 본 논문에서는 source data를 target data 로 adapt하는 방식을 제안
+기존의 작업들은 소스 데이터에 noise 가 껴서 label 이 잘못되어있거나, target data와 match 가 안된다는 문제점을 지니고 있다 → 따라서 본 논문에서는 source data를 target data 로 adapt하는 방식을 제안한다.
 
-또한 target data 관점에서 noisy 한 소스 데이터를 제거함으로써, 타겟 데이터에 잘 맞으면서 잘못된 라벨링을 가려낼 수 있는 방식 또한 제안함 
+또한 target data 관점에서 adaptation 하는데 잘 맞지 않는 source data의 noisy 한 소스 데이터를 제거함으로써, 타겟 데이터에 잘 맞으면서 잘못된 라벨링을 가려낼 수 있는 방식 또한 제안하였다.
 
 ---
 
 ## Method
 
-기존 semi supervised 방식은 단순히 소스 데이터와 타겟 데이터간 cross entropy loss 를 걸어서 domain adaptation 을 진행하였으나, 이 방식같은 경우에는 domain shift 문제가 발생한다.(타겟과 소스간 차이가 너무 커서 adaptation 이 잘 안되는 것)
+기존 semi supervised 방식은 단순히 소스 데이터와 타겟 데이터간 cross entropy loss 를 걸어서 domain adaptation 을 진행하였으나, 이 방식같은 경우에는 domain shift 문제가 발생한다. (타겟과 소스간 차이가 너무 커서 adaptation 이 잘 안되는 것)
 
-또 이 문제 해결하기 위해 ! 라벨링 안된 데이터셋에다가 수도 라벨링을 하거나, entropy minimization 을 진행하거나, comsistency regularization 등을 진행한다.
+또한 이 문제 해결하기 위해, 라벨링 안된 데이터셋에다가 수도 라벨링을 하거나, entropy minimization 을 진행하거나, comsistency regularization 등을 진행한다.
 
 → 근데 이런것도 타겟 데이터가 어느정도 소스 데이터와 semantic하게 비슷해야한다는 것을 전제하므로, 한계가 명확하게 존재한다. 
 
@@ -67,6 +67,14 @@ center = [t_feat[label == i].mean(dim=0) for i in range(num_classes)]
 - 여기서 `t_loader`는 **target domain의 validation or unlabeled test loader**
 - 따라서 `self.center`는 **target domain feature space** 기준의 중심
 
+### Centers 는 어떻게 구하는 것인가?
+
+center를 잡는 과정은 unlabeled target data에 대해서 수도 라벨(pseudo label)을 기반으로 잡는데,
+정답은 모르지만, model의 예측 결과를 신뢰해서 pseudo label로 취급하는 방식이라고 보면 된다.
+source label 의 정답 라벨이 아니라, 모델이 현재까지 학습한 결과를 기반으로 만든 pseudo prototype이라고 생각하면 된다.
+
+결국 이 center가 **target 도메인에 맞게 source label을 adaptation 하기 위한 reference 역할을 하는 것!**
+
 ![image.png](/static/images/semi-supervised-da/image2.png)
 
 입력 `x`는 일반적으로 **source domain의 feature** (학습용 데이터)로,  이 `x`와 **target 도메인의 중심 (`self.center`) 간 거리**를 바탕으로 soft label 생성한다.
@@ -99,7 +107,7 @@ soft_label = F.softmax(-dist * T, dim=1)
 
 SLA 같은 경우에는 모듈로써 네트워크 통으로 제안하는게 아니라, 기존 SOTA 모델에 붙여서 사용했었을 때 adaptation 성능이 올라간다는 것을 제안하였는데, 이 SOTA모델로 MME와 CDAC를 대표적으로 사용하였다.
 
-MME는**Minimum Entropy for Semi-supervised Domain Adaptation**의 약자로, 도메인 적응에서 **target 도메인에 label이 없을 때**에도 **의미 있는 피드백을 주는** 기법이다. (즉 unlabled target에 대한 loss 를 제안한 논문이죠)
+MME는**Minimum Entropy for Semi-supervised Domain Adaptation**의 약자로, domain adaptation에서 **target 도메인에 label이 없을 때**에도 **의미 있는 피드백을 주는** 기법이다. (즉 unlabled target에 대한 loss 를 제안한 논문)
 
 이 개념은 2020년 CVPR 논문인 **"Minimum Class Confusion for Domain Adaptation"** 및 **"Unsupervised Domain Adaptation by Minimizing Conditional Entropy"** 등의 영향을 받았다.
 
@@ -116,19 +124,26 @@ out = F.softmax(out, dim=1)                   # 확률 분포화
 return lamda * torch.mean(torch.sum(out * (torch.log(out + 1e-10)), dim=1))
 ```
 
-out: target sample에 대한 softmax 결과
-torch.sum(out * log(out)): entropy
-lamda: loss에 적용되는 가중치 
+- out: target sample에 대한 softmax 결과
+- torch.sum(out * log(out)): entropy
+- lamda: loss에 적용되는 가중치 
 
 이런식으로 loss를 구성하게 되면 unlabled된 target data에도 labeling 이 하나에 클래스에 confident 하게 확률 분포가 구성되는 방식으로 학습되게 되므로, 타겟 데이터에 대해 예측 분포의 엔트로피를 줄이도록 학습되는 방식이라고 보면 된다.
+
+즉, **target 예측의 entropy를 줄이는 것** → **결과적으로 더 confident한 결정 경계를 유도하는 것 !**
+
+### Gradient reversal layer (GRL) 을 통한 min-max 구조 학습
+
+MME에서는 classifier 입장에서는 entropy 를 최대화하는 방식으로, feature extractor는 entropy를 최소화하는 방식으로 학습이 되어야 하는데,
+(classifier의 entropy를 줄이면 classifier가 너무 confident 해져서 모델이 overfitting 날 확률이 있기 때문에, classifier는 entropy 를 최대화로 만들고, feature extractor는 이를 이겨내서 entropy 를 줄이도록 학습한다)
+
+이 구조로 학습하게 되면 domain-invariant 하면서도 class-discriminative한 피처를 만드는데 이점을 지닌다.
 
 🧠 참고:
 
 reverse=True → Gradient Reversal Layer 사용 (DANN과 동일한 기법)
 
 Gradient Reversal Layer(GRL)는 도메인 적응에서 사용되는 특수한 연산으로, 순전파에서는 입력을 그대로 통과시키지만 역전파 시에는 gradient의 부호를 반전시켜 모델이 도메인 분류기를 속이도록 학습하게 만든다. 이를 통해 feature extractor가 source와 target 도메인을 구분할 수 없도록 일반화된 특징을 추출하게 하며, adversarial 학습 구조에서 핵심적인 역할을 수행한다.
-
-즉, **target 예측의 entropy를 줄이는 것** → **결과적으로 더 confident한 결정 경계를 유도하는 것 !**
 
 ---
 
@@ -190,7 +205,7 @@ adv_bce_loss = -bce(prob_bottleneck_row, prob_bottleneck_col, target_ulb)
 return adv_bce_loss
 ```
 
-- `reverse=True`: Gradient Reversal Layer (GRL)를 거쳐서 도메인 분류기를 속이도록 학습
+- `reverse=True`: Gradient Reversal Layer (GRL)를 거쳐서 domain classifier를 속이도록 학습
 - `advbce_unlabeled`: 도메인 불변 feature 유도를 위한 adversarial binary cross entropy 손실
 
 → **GRL + Adversarial BCE** = MME처럼 작동, 그러나 두 가지 입력(f, f1)으로 정밀화한 방식이라고 보면 된다.
@@ -237,12 +252,34 @@ con_loss = F.mse_loss(prob1, prob2)
 return aac_loss + pl_loss + w_cons * con_loss
 ```
 
-- 세 가지 손실을 더함
+- 세 가지 손실을 더한다.
 - `w_cons`: consistency loss는 **초기에는 무시**하고, **학습이 안정되면 점차 증가**
 
 이렇게 각각 MME, CDAC에서 제안한 Loss에 SLA loss를 추가하여 성능 향상을 입증한 것이다.
 
 ---
+
+##  Experiment & Results
+
+직접 실험을 통해 MME + SLA 조합이 기존 방식 대비 얼마나 성능 향상을 가져오는지 검증해보았다.  
+실험은 **DomainNet**과 같은 벤치마크 데이터셋을 기반으로 진행되었으며, target domain에만 소량의 라벨링 데이터를 제공하는 **semi-supervised setting**에서 수행되었다.
+(코드 실험 및 ResNet 50으로 바꿔서 실험했었을 때 결과를 확인해보고 싶었다.)
+
+아래는 SLA loss 적용 전후의 주요 성능 지표 비교이다:
+
+![result.png](/static/images/semi-supervised-da/result.png)
+
+논문 수치보다 높거나 비슷하게 나온 결과를 확인해 볼 수 있었다.
+
+ResNet50으로 바꿔서 실험한 결과도 진행해보았는데,
+
+![result2.png](/static/images/semi-supervised-da/result2.png)
+
+확실히 성능 향상 효과가 있었다. 아마 이전 논문들과의 fair한 비교를 위해서 ResNet34를 선택했을 듯.
+
+---
+
+**추가적으로 정리한 내용들**
 
 ## 1. Hard Label vs. Soft Label
 

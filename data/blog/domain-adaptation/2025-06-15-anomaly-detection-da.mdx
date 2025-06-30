@@ -17,7 +17,7 @@ Semi-supervised anomaly detection 문제는 target 도메인에서 라벨링된 
 
 # Overall Method
 
-![method](../../public/static/images/anomaly-detection-da/method.png)
+![method.png](/static/images/anomaly-detection-da/method.png)
 
 이 구조는 다른 semi-supervised 방식과 동일하게 feature extraction 과정 중 domain adaptation을 결합하여 target 도메인의 anomaly detection 성능을 향상시키는 것이 목표.  
 Source data는 ImageNet으로 pre-trained된 ResNet-50을 통해 feature를 추출하며, normal 데이터만 사용된다.  
@@ -61,7 +61,7 @@ Generator에서는 다음과 같은 방식으로 학습이 진행된다:
 
 Discriminator는 이 세 가지 이미지와 실제 source 이미지를 구분하도록 학습되며, 이 과정을 통해 **target domain에 align된 feature 공간을 구축**할 수 있게 된다.
 
-![loss](../../public/static/images/anomaly-detection-da/loss.png)
+![loss.png](/static/images/anomaly-detection-da/loss.png)
 
 Adversarial Loss는 생성된 이미지가 진짜 source 이미지처럼 보이도록 학습하는 데 핵심적인 역할을 한다. GAN의 기본 아이디어에 기반하여, Generator는 Discriminator를 속이도록 학습되고, Discriminator는 진짜와 가짜 이미지를 구분하는 역할을 한다.
 
@@ -74,11 +74,11 @@ Adversarial Loss는 생성된 이미지가 진짜 source 이미지처럼 보이�
 + \mathbb{E}_{x_{src}, x_{tgt}}[\log(1 - D_{src}(x'_{tgt}))] + \mathbb{E}_{x_{src}}[\log(1 - D_{src}(x_{rnd}))]
 ```
 
-x'_{src}는 source에서 생성된 복원 이미지이다.
+`x'_{src}`는 source에서 생성된 복원 이미지이다.
 
-x'_{tgt}는 source의 private feature와 target의 shared feature로부터 생성된 이미지이다.
+`x'_{tgt}`는 source의 private feature와 target의 shared feature로부터 생성된 이미지이다.
 
-x_{rnd}는 무작위 z와 source shared feature로부터 생성된 이미지이다.
+`x_{rnd}`는 무작위 z와 source shared feature로부터 생성된 이미지이다.
 
 이러한 다양한 조합의 생성 이미지를 통해 Discriminator는 더 강력하게 훈련되고, Generator와 Encoder는 더 정밀한 생성 결과를 출력할 수 있도록 학습된다.
 
@@ -91,9 +91,9 @@ Adversarial Loss는 모델이 보다 실제와 유사한 이미지를 생성하�
 
 Cycle Consistency는 생성된 이미지가 원래 입력을 재현할 수 있도록 보장해준다. 이는 모델이 실질적인 변환만을 수행하고, 의미 있는 feature 공간을 학습하게 만드는 데 도움이 된다.
 
-Source에서 생성된 x'_{src}는 다시 encoder에 통과되어 original x_{src}와의 유사도를 유지하도록 학습된다.
+Source에서 생성된 `x'_{src}`는 다시 encoder에 통과되어 original `x_{src}`와의 유사도를 유지하도록 학습된다.
 
-마찬가지로, x'_{tgt} 역시 target 스타일을 유지하면서도 source 기반의 생성 결과가 되도록 설계된다.
+마찬가지로, `x'_{tgt}` 역시 target 스타일을 유지하면서도 source 기반의 생성 결과가 되도록 설계된다.
 
 Cycle consistency loss는 다음과 같이 표현된다:
 

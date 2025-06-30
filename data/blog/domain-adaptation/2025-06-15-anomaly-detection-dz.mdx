@@ -41,7 +41,7 @@ Discriminator는 사전학습되지 않은 ResNet-18을 기반으로 이루어�
 # Method
 ## Shared + Private Encoder
 
-기존의 domain adaptation 연구에서는 도메인이 달라져도 변하지 않는 **공통된 feature (domain-invariant feature)**를 추출하는 방식이 일반적이다.  
+기존의 domain adaptation 연구에서는 도메인이 달라져도 변하지 않는 **공통된 feature (domain-invariant feature)** 를 추출하는 방식이 일반적이다.  
 IRAD는 이러한 기존 방식에 기반을 두면서도, **공통 feature와 domain-specific feature를 명확히 분리**하는 데 중점을 둔다.
 
 이를 위해 shared encoder와 더불어 **private encoder**를 도입하였으며, 특히 source 도메인에 대해 특정된 정보를 뽑아내기 위해 adversarial training 구조를 사용하였다.
@@ -80,11 +80,13 @@ shared encoder와 private encoder가 **서로 다른 특징**을 추출해야 �
 
 ```math
 l_{dis} = ||E_{sh}(x_{src})^T E_{pv}(x_{src})||
+```
 
 ### Similarity Loss
 
 ```math
 l_{sim} = - \left\| E_{sh}(x_{src})^T E_{sh}(x_{tgt}) \right\|
+```
 
 Source와 target의 shared feature가 유사한 방향을 갖도록 유도하기 위해 두 벡터의 내적을 최대화하는 방향으로 학습된다.이는 target 데이터가 적은 상황에서도 공통 feature space를 효과적으로 구축하기 위한 핵심 요소이다.
 

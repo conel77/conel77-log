@@ -17,6 +17,8 @@ Semi-supervised anomaly detection 문제는 target 도메인에서 라벨링된 
 
 # Overall Method
 
+![method.png](/static/images/anomaly-detection-da/method.png)
+
 이 구조는 다른 semi-supervised 방식과 동일하게 feature extraction 과정 중 domain adaptation을 결합하여 target 도메인의 anomaly detection 성능을 향상시키는 것이 목표.  
 Source data는 ImageNet으로 pre-trained된 ResNet-50을 통해 feature를 추출하며, normal 데이터만 사용된다.  
 
@@ -48,7 +50,7 @@ IRAD는 이러한 기존 방식에 기반을 두면서도, **공통 feature와 d
 
 ---
 
-## Generator Training
+## Adversarial Loss
 
 Generator에서는 다음과 같은 방식으로 학습이 진행된다:
 
@@ -59,22 +61,55 @@ Generator에서는 다음과 같은 방식으로 학습이 진행된다:
 
 Discriminator는 이 세 가지 이미지와 실제 source 이미지를 구분하도록 학습되며, 이 과정을 통해 **target domain에 align된 feature 공간을 구축**할 수 있게 된다.
 
+![loss.png](/static/images/anomaly-detection-da/loss.png)
+
+Adversarial Loss는 생성된 이미지가 진짜 source 이미지처럼 보이도록 학습하는 데 핵심적인 역할을 한다. GAN의 기본 아이디어에 기반하여, Generator는 Discriminator를 속이도록 학습되고, Discriminator는 진짜와 가짜 이미지를 구분하는 역할을 한다.
+
+다음은 IRAD 논문에서 정의된 adversarial loss 함수이다:
+
+
+```math
+\min_{E_{sh}, E_{pv}, G_{src}} \max_{D_{src}} V(D_{src}, G_{src}, E_{pv}, E_{sh}) = 
+\mathbb{E}_{x_{src}}[\log D_{src}(x_{src})] + \mathbb{E}_{x_{src}}[\log(1 - D_{src}(x'_{src}))] 
++ \mathbb{E}_{x_{src}, x_{tgt}}[\log(1 - D_{src}(x'_{tgt}))] + \mathbb{E}_{x_{src}}[\log(1 - D_{src}(x_{rnd}))]
+```
+
+x'_{src}는 source에서 생성된 복원 이미지이다.
+
+x'_{tgt}는 source의 private feature와 target의 shared feature로부터 생성된 이미지이다.
+
+x_{rnd}는 무작위 z와 source shared feature로부터 생성된 이미지이다.
+
+이러한 다양한 조합의 생성 이미지를 통해 Discriminator는 더 강력하게 훈련되고, Generator와 Encoder는 더 정밀한 생성 결과를 출력할 수 있도록 학습된다.
+
+Adversarial Loss는 모델이 보다 실제와 유사한 이미지를 생성하게 만들며, anomaly detection의 신뢰도를 높이는 데 기여한다.
+
+
 ---
 
 ## Cycle Consistency Loss
 
-GAN 기반 학습에서는 high-dimensional 공간에서 mode collapse 혹은 비현실적인 결과가 발생하는 문제가 있다. 이를 해결하기 위해 본 논문에서는 **Cycle Consistency Loss**를 추가로 도입하였다.
+Cycle Consistency는 생성된 이미지가 원래 입력을 재현할 수 있도록 보장해준다. 이는 모델이 실질적인 변환만을 수행하고, 의미 있는 feature 공간을 학습하게 만드는 데 도움이 된다.
 
-- **진짜 source 이미지 ↔ 생성된 source 이미지 간 차이**  
-- **진짜 source 이미지 ↔ target feature로부터 생성된 source 이미지 간 차이**
+Source에서 생성된 x'_{src}는 다시 encoder에 통과되어 original x_{src}와의 유사도를 유지하도록 학습된다.
 
-이러한 두 종류의 consistency loss를 통해 학습의 안정성을 확보하고자 하였다.
+마찬가지로, x'_{tgt} 역시 target 스타일을 유지하면서도 source 기반의 생성 결과가 되도록 설계된다.
+
+Cycle consistency loss는 다음과 같이 표현된다:
+
+
+```math
+l_{cyc} = \mathbb{E}_{x_{src}} [ \| x_{src} - G(E_{pv}(x_{src}) + E_{sh}(x_{src})) \|^2 ] + \mathbb{E}_{x_{tgt}} [ \| x_{tgt} - G(E_{pv}(x_{src}) + E_{sh}(x_{tgt})) \|^2 ]
+```
+
+이 손실은 기존 GAN 기반 모델들이 고차원에서 발생하는 mode collapse 또는 reconstruction fail case를 완화하는 데 중요한 역할을 한다.
 
 ---
 
-# Feature 분리 최적화를 위한 추가 Loss
+# Additional Loss - Disentanglement Loss, Similarity Loss
 
 shared encoder와 private encoder가 **서로 다른 특징**을 추출해야 하기 때문에, 각 encoder의 역할을 명확히 분리하는 목적의 추가적인 loss term을 도입하였다.
+Disentanglement Loss는 공통 feature와 private feature의 내적을 최소화함으로써 서로 다른 정보만을 담도록 학습된다.
 
 ###  Disentanglement Loss
 
@@ -84,9 +119,13 @@ l_{dis} = ||E_{sh}(x_{src})^T E_{pv}(x_{src})||
 
 ### Similarity Loss
 
+Similarity Loss는 Source와 target의 shared feature가 유사한 방향을 갖도록 유도하기 위해 두 벡터의 내적을 최대화하는 방향으로 학습된다. 이는 target 데이터가 적은 상황에서도 공통 feature space를 효과적으로 구축하기 위한 핵심 요소이다.
+
 ```math
 l_{sim} = - \left\| E_{sh}(x_{src})^T E_{sh}(x_{tgt}) \right\|
 ```
 
-Source와 target의 shared feature가 유사한 방향을 갖도록 유도하기 위해 두 벡터의 내적을 최대화하는 방향으로 학습된다.이는 target 데이터가 적은 상황에서도 공통 feature space를 효과적으로 구축하기 위한 핵심 요소이다.
+---
 
+더 자세한 내용은, 본 논문을 참고하면 된다 !:  
+[📄 Read the paper on arXiv](https://openaccess.thecvf.com/content/CVPR2023W/VAND/papers/Yang_Anomaly_Detection_With_Domain_Adaptation_CVPRW_2023_paper.pdf)

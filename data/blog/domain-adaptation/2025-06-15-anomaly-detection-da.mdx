@@ -17,7 +17,7 @@ Semi-supervised anomaly detection 문제는 target 도메인에서 라벨링된 
 
 # Overall Method
 
-![method.png](/static/images/anomaly-detection-da/method.png)
+![method](../../public/static/images/anomaly-detection-da/method.png)
 
 이 구조는 다른 semi-supervised 방식과 동일하게 feature extraction 과정 중 domain adaptation을 결합하여 target 도메인의 anomaly detection 성능을 향상시키는 것이 목표.  
 Source data는 ImageNet으로 pre-trained된 ResNet-50을 통해 feature를 추출하며, normal 데이터만 사용된다.  
@@ -61,7 +61,7 @@ Generator에서는 다음과 같은 방식으로 학습이 진행된다:
 
 Discriminator는 이 세 가지 이미지와 실제 source 이미지를 구분하도록 학습되며, 이 과정을 통해 **target domain에 align된 feature 공간을 구축**할 수 있게 된다.
 
-![loss.png](/static/images/anomaly-detection-da/loss.png)
+![loss](../../public/static/images/anomaly-detection-da/loss.png)
 
 Adversarial Loss는 생성된 이미지가 진짜 source 이미지처럼 보이도록 학습하는 데 핵심적인 역할을 한다. GAN의 기본 아이디어에 기반하여, Generator는 Discriminator를 속이도록 학습되고, Discriminator는 진짜와 가짜 이미지를 구분하는 역할을 한다.
 

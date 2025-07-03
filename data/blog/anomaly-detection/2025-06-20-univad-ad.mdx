@@ -179,7 +179,7 @@ $$
 이후에는 특징 맵을 일정한 크기로 보간(interpolation)하여, 패치 단위의 특징을 갖는 $P_q \in \mathbb{R}^{H_2 \times W_2 \times C}, P_n \in \mathbb{R}^{K \times H_2 \times W_2 \times C}$형태의 **patch-level feature**로 변환합니다. 이렇게 얻어진 패치들 간의 유사도를 바탕으로, 쿼리 이미지의 각 패치  $P_i^q$와 정상 이미지들의 모든 패치 $P_n$ 사이의 cosine 거리 중 **최소값**을 취해 해당 패치의 이상 점수로 사용합니다. 이 방식은 다음과 같이 수식으로 표현됩니다:
 
 $$
-\text{Score}_{pm}(P_i^q) = \min(\text{distance}(P_i^q, P_n))
+\text{Score}_{\text{pm}}(P_i^q) = \min(\text{distance}(P_i^q, P_n))
 $$
 
 이와 같은 전통적인 patch feature matching은 빠르고 직관적이지만 몇 가지 중요한 한계가 있습니다. 예를 들어, 이미지의 **배경 영역과 전경(관심 객체) 영역을 구분하지 못하기 때문에**, 배경에서의 패턴 변화에도 이상 점수가 높게 나오는 **false positive**가 발생할 수 있습니다. 
@@ -188,10 +188,10 @@ $$
 
 이러한 문제를 해결하기 위해 UniVAD는 컴포넌트 기반(component-aware)의 보완 전략을 도입합니다. 앞서 3.2절에서 설명된 C3 모듈을 통해 얻은 **컴포넌트 마스크**를 활용하여, 이미지의 각 패치를 **컴포넌트 단위로 분리**합니다. 즉, 각 정상 이미지의 패치 특징 $P_n$에서, 특정 컴포넌트 마스크 $M_i$에 해당하는 위치의 패치들만 모아 하나의 집합 $P_n^i$ 를 구성합니다. 쿼리 이미지의 패치 $P_q$도 동일한 방식으로 컴포넌트별로 나누어 $P_q^i$를 생성합니다.
 
-이제 쿼리 이미지의 각 컴포넌트 내 패치 $P_j^{qi}$는, 해당 컴포넌트에 해당하는 정상 패치 집합 $P_n^i$ 와만 비교됩니다. 그리고 이들 사이의 cosine 거리 중 최소값을 이상 점수로 사용하게 되며, 이는 다음 수식으로 표현됩니다:
+이제 쿼리 이미지의 각 컴포넌트 내 패치 $P_j^{\text{qi}}$는, 해당 컴포넌트에 해당하는 정상 패치 집합 $P_n^i$ 와만 비교됩니다. 그리고 이들 사이의 cosine 거리 중 최소값을 이상 점수로 사용하게 되며, 이는 다음 수식으로 표현됩니다:
 
 $$
-\text{Score}_{aware}(P_j^{qi}) = \min(\text{distance}(P_j^{qi}, P_n^i))
+\text{Score}_{aware}(P_j^{\text{qi}}) = \min(\text{distance}(P_j^{\text{qi}}, P_n^i))
 $$
 
 이 방식은 **서로 다른 컴포넌트 간의 매칭을 방지**하고, **정확한 의미 단위 내에서의 비교**를 가능하게 하여 탐지 정확도를 크게 높입니다.
@@ -201,17 +201,17 @@ $$
 - 정상을 나타내는 텍스트: `"a normal machine part"` → $T_n \in \mathbb{R}^C$
 - 이상을 나타내는 텍스트: `"a broken or missing component"` → $T_a \in \mathbb{R}^C$
 
-그 다음, 쿼리 이미지의 각 패치 특징 $P_j^{qi}$ 와 이 두 텍스트 임베딩 간의 **cosine similarity**를 구하고, softmax를 적용하여 각 패치가 정상이 더 가까운지, 이상이 더 가까운지를 나타내는 **확률적 점수**를 생성합니다:
+그 다음, 쿼리 이미지의 각 패치 특징 $P_j^{\text{qi}}$ 와 이 두 텍스트 임베딩 간의 **cosine similarity**를 구하고, softmax를 적용하여 각 패치가 정상이 더 가까운지, 이상이 더 가까운지를 나타내는 **확률적 점수**를 생성합니다:
 
 $$
-\text{Score}_{vl}(P_j^{qi}) = \text{softmax}(\text{sim}(P_j^{qi}, [T_n, T_a]))
+\text{Score}_{vl}(P_j^{\text{qi}}) = \text{softmax}(\text{sim}(P_j^{\text{qi}}, [T_n, T_a]))
 $$
 
 이렇게 하면 해당 패치가 **개념적으로 이상한지 여부**도 반영할 수 있게 되어, 의미 기반 탐지 정확도가 향상됩니다.
 
 마지막으로, 위에서 설명한 세 가지 점수 —
 
-(1) 기존 patch matching 점수 $\text{Score}_{pm},$
+(1) 기존 patch matching 점수 $\text{Score}_{\text{pm}},$
 
 (2) 컴포넌트-aware 점수 $\text{Score}_{aware},$
 
@@ -220,7 +220,7 @@ $$
 를 가중합하여 최종적인 구조적 이상 점수 맵 $\text{Score}_{stru}$를 계산합니다:
 
 $$
-\text{Score}_{stru} = \alpha \cdot \text{Score}_{pm} + \beta \cdot \text{Score}_{aware} + \gamma \cdot \text{Score}_{vl}
+\text{Score}_{stru} = \alpha \cdot \text{Score}_{\text{pm}} + \beta \cdot \text{Score}_{aware} + \gamma \cdot \text{Score}_{vl}
 $$
 
 실험에서는 각 가중치 $\alpha, \beta, \gamma$ 를 동일하게 1/3으로 설정하여 평균을 사용했습니다. 이 최종 구조적 이상 점수는 이후의 GECM에서 생성된 논리적 이상 점수와 결합되어 UniVAD의 최종 anomaly map으로 이어지게 됩니다.
@@ -247,7 +247,7 @@ $$
 - 쿼리 이미지의 각 패치 $P_i^q$ 에 대해 정상 이미지 전체 패치 $P_n$과의 **cosine distance** 최소값을 구함:
     
     $$
-    \text{Score}_{pm}(P_i^q) = \min(\text{distance}(P_i^q, P_n))
+    \text{Score}_{\text{pm}}(P_i^q) = \min(\text{distance}(P_i^q, P_n))
     $$
     
 - 근데 여기서의 문제점은 배경과 전경을 구분 못 함 → **배경에 false positive 발생**
@@ -280,7 +280,7 @@ $$
 - 각 patch의 anomaly score는 해당 컴포넌트 내 정상 패치와의 거리 최소값:
     
     $$
-    \text{Score}_{aware}(P_j^{qi}) = \min(\text{distance}(P_j^{qi}, P_n^i))
+    \text{Score}_{aware}(P_j^{\text{qi}}) = \min(\text{distance}(P_j^{\text{qi}}, P_n^i))
     $$
     
 - 서로 **다른 컴포넌트**끼리 매칭되는 현상을 방지
@@ -303,10 +303,10 @@ $$
 
 ### 이미지 patch 피처와 텍스트 피처 간 cosine similarity 계산
 
-- 각 쿼리 패치 특징 PjqiP_j^{qi}Pjqi에 대해 $T_n, T_a$ 와의 유사도:
+- 각 쿼리 패치 특징 $P_j^{\text{qi}}$에 대해 $T_n, T_a$ 와의 유사도:
     
     $$
-    \text{Score}_{vl}(P_j^{qi}) = \text{softmax}(\text{sim}(P_j^{qi}, [T_n, T_a]))
+    \text{Score}_{vl}(P_j^{\text{qi}}) = \text{softmax}(\text{sim}(P_j^{\text{qi}}, [T_n, T_a]))
     $$
     
 - softmax는 유사도를 확률처럼 정규화하여
@@ -322,7 +322,7 @@ $$
 위의 세 가지 score를 결합해서 최종 structural anomaly map을 생성한다:
 
 $$
-\text{Score}_{stru} = \alpha \cdot \text{Score}_{pm} + \beta \cdot \text{Score}_{aware} + \gamma \cdot \text{Score}_{vl}
+\text{Score}_{stru} = \alpha \cdot \text{Score}_{\text{pm}} + \beta \cdot \text{Score}_{aware} + \gamma \cdot \text{Score}_{vl}
 $$
 
 - 실험에서는 $\alpha = \beta = \gamma = \frac{1}{3}$로 설정

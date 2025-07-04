@@ -99,6 +99,13 @@ $\nabla g(z_t, y, t)$는 “지금 생성되고 있는 내용이 label y와 얼�
     - **모션 관련 신호에만 집중**하고 불필요한 노이즈/미세모션은 무시 → **모션 클로닝 성능이 뚜렷하게 향상**됨.
     - 논문에서 “primary control over sparse temporal attention map significantly boosts motion alignment”라고 강조하고 있다.
 
+
+![control.png](/static/images/motionclone/control.png)
+
+기존 방식의 plain control 시의 video generation 결과와 primary control을 적용했을 때의 video generation 결과를 확인해보면,
+확실히 reference로 준 video의 행동이라던지 카메라 무빙을 잘 따라가는 모습을 확인할 수 있다.
+
+
 ## Motion Representation
 
 ### Temporal attention map based motion representation
@@ -127,10 +134,12 @@ $$A_t^{\text{ref}} \in \mathbb{R}^{(1 \times h \times w) \times f \times f}$$
 
 ## 3. Sparse Mask $M_t$ 생성
 
-$$\begin{cases}
+$$
+\begin{cases}
 1, & \text{if } [A_t^{\text{ref}}]_{p, i, j} \in \Omega^t_{p, i} \\
 0, & \text{otherwise}
-\end{cases}$$
+\end{cases}
+$$
 
 - $\Omega^t_{p, i}$: attention 값이 높은 top-k 프레임 인덱스 j들의 집합.
 - 결과적으로 $M_t$는 **중요한 모션 상호작용만 유지**하는 **희소한 마스크**가 됨.
@@ -175,7 +184,14 @@ $$\begin{cases}
 | $L_{t_\alpha}$ | 중요한 attention만 추출한 모션 신호 |
 | $H_{t_\alpha} = \{L, M\}$ | 한 시점의 sparse 모션 표현 (적은 비용으로 추출 가능) |
 
+![motionrepresentation.png](/static/images/motionclone/motionrepresentation.png)
+
+이렇게 motion representation 방식을 적용하게 되면, 행동에 있어 중요한 frame을 더 attention 하게 됨으로써
+카메라의 무빙이라던지, 동물의 움직임 등 **행동을 condition 으로 줄 수 있게 된다.**
+
 ## Motion Guidance
+
+![pipeline.png](/static/images/motionclone/pipeline.png)
 
 motion guidance를 주는 방식을 알려면 motionclone 의 전반적인 pipeline을 알아야하는데,
 

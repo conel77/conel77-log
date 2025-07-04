@@ -1,0 +1,246 @@
+---
+title: "MotionClone: Training-Free Motion Cloning for Controllable Video Generation(CVPR2025)"
+date: "2025-07-02"
+tags: ['video generation', 'motionclone', 'motion-controlled', 'controllable video generation', 'diffusion']
+draft: false
+summary: "video generation 분야에서 motion controll이 가능한 controllable video diffusion model 논문 리뷰"
+---
+
+
+# MotionClone: Training-Free Motion Cloning for Controllable Video Generation
+
+
+diffusion 을 활용한 video generation 에 대해 기본적으로 알아야 하는 개념들에 대해 몇개 짚고 시작해보려한다. 
+
+### **Temporal attention :**
+
+시간 순서로 주어진 비디오 프레임들 사이에서, 각 프레임 또는 시점이 **얼마나 중요한지를 학습하는 어텐션 메커니즘**을 의미
+
+- 예: $\alpha_t$ = 시점 t의 중요도 (attention weight)
+
+### **Motion Representation**
+
+motion representation 이라는 개념은 시간 흐름에 따른 물체나 장면의 변화, 즉 움직임을 수치화하거나 특징 벡터로 표현한 것이다.
+
+- temporal attention weights는 어떤 시점의 변화가 중요한지를 모델이 학습한 값.
+- 따라서, 이 가중치 자체를 **"어떤 시점에서 모션이 크게 일어난다"**, **"특정 행동을 인식하는 데 중요한 순간이다"** 등의 정보로 사용하면 **motion representation**
+
+어떤 특정 프레임에서 이 행동이 중요하게 일어났는가를 weight 로 매겨서 여기에 attention 을 많이 주는 방식
+
+## Preliminaries
+
+> Diffusion 모델의 sampling 경로(trajectory)는 원래는 확률적이지만, 여기에 external guidance (예: label, 모션 정보 등)를 추가하면 원하는 방향으로 생성 이미지를 유도할 수 있다는 것을 가정한다.
+> 
+
+---
+
+$$\hat{\epsilon}_\theta = \epsilon_\theta(z_t, c, t) + s\left(\epsilon_\theta(z_t, c, t) - \epsilon_\theta(z_t, \phi, t)\right) - \lambda \sqrt{1 - \bar{\alpha}_t} \nabla_{z_t} g(z_t, y, t)$$
+
+**noise prediction 결과 $\hat{\epsilon}_\theta$** 를 다음과 같이 수정한다.
+
+식이 어떻게 구성되어있는지 확인해보면, 
+
+| 기호 | 의미 |
+| --- | --- |
+| $z_t$ | 현재 timestep t에서의 noised latent |
+| $\epsilon_\theta(z_t, c, t)$ | 조건 c (예: 텍스트 프롬프트)하의 노이즈 예측 |
+| $\epsilon_\theta(z_t, \phi, t)$ | **Unconditional** 노이즈 예측 (e.g., null 텍스트) |
+| s | Classifier-free guidance weight |
+| $g(z_t, y, t)$ | **Energy function**: label y 기반 추가 control 하는 목적 함수 |
+| $\lambda$ | energy guidance strength  |
+| $\bar{\alpha}_t$ | Noise schedule의 하이퍼파라미터 (DDPM의 알파바) |
+1. **기본 noise prediction**:
+    
+    $\epsilon_\theta(z_t, c, t)$
+    
+2. **Classifier-free guidance (CFG)**:
+    - $s(\epsilon_\theta(z_t, c, t) - \epsilon_\theta(z_t, \phi, t))$
+    - 조건 프롬프트를 더 강하게 반영하게 만드는 방법 (Ho & Salimans, 2022)
+3. **Custom energy-based guidance**:
+    - $\lambda \sqrt{1 - \bar{\alpha}_t} \nabla_{z_t} g(z_t, y, t)$
+    - label y나 모션 정보 등 외부 정보 기반으로 정의된 **에너지 함수의 gradient**를 통해 latent 방향 조절
+4. **전체 noise prediction 보정 결과**:
+    - 위 세 항을 모두 합쳐 샘플링 경로를 **의도한 방향(= y)** 으로 유도
+
+---
+
+- Diffusion 모델은 timestep t에서 다음 latent를 **noise prediction을 통해 점진적으로 denoise**하며 샘플을 생성한다.
+- 그런데 **gradient-based energy guidance**를 통해 원하는 속성(label y)을 만족하도록 latent 방향을 미세 조정할 수 있음을 보이는데,
+- $\sqrt{1 - \bar{\alpha}_t}$는 energy gradient가 noise space에 있도록 **스케일을 맞추기 위한 보정** (DDPM의 노이즈 구성: $$z_t = \sqrt{\bar{\alpha}_t} z_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$$ )
+
+---
+
+본 논문에서 사용한 sampling 과정에서의 수식은 **기존의 classifier-free guidance**와 **energy-based guidance**를 결합한 형태로 **샘플링 과정에서 latent에 추가적인 constraint을 걸어, label이나 모션 같은 속성을 더 정확히 반영하고,**
+
+$\nabla g(z_t, y, t)$는 “지금 생성되고 있는 내용이 label y와 얼마나 잘 맞는지를 측정한 에너지 함수” 로부터 유도된다.
+
+## Observation: 모든 frame의 행동이 다 중요할까? X
+
+기존 방식은 plain control로 진행 → 이를 primary control 로 다룸
+
+### Plain Control
+
+- 기존 방식은 reference 비디오의 모든 temporal attention weight를 생성 중인 비디오에도 **균등하게 강제 적용**하는 방식을 사용했었다.
+- **문제점**:
+    - 영상 전반의 rectangular attention weight에는 실제 의미 있는 모션뿐만 아니라 **노이즈나 아주 미세한 움직임**도 포함됨 → 이를 전부 맞추다 보면 모션 신호가 약해져서 핵심적으로 전달해야하는 행동을 따라하지 못한다.
+    - 결과적으로 강한 **모션 패턴만 일부 전달**되고, **정확한 모션 클로닝**은 실패하는 경우가 많다. 논문에서는 고양이 걷는 동작, 탱크의 방향 전환 정도만 부분적으로 복제된다고 언급합
+
+### Primary Control (본 논문에서 사용)
+
+- 전체 attention map이 아닌, **sparse temporal attention mask**로부터 **가장 중요한(principal)** weight들만 골라 constraint를 건다.
+- **방식**
+    1. reference 비디오의 temporal attention map에서 **모션을 주도하는 주요 컴포넌트**(large weight)의 부분 집합을 찾는다.
+    2. 생성 중인 비디오 역시 이 중요 weight들만 맞추도록 유도 (아래 식과 같은 mask M 적용) .
+    
+        
+        ![mask.png](/static/images/motionclone/mask.png)
+        
+- 이로인한 이점은
+    - **모션 관련 신호에만 집중**하고 불필요한 노이즈/미세모션은 무시 → **모션 클로닝 성능이 뚜렷하게 향상**됨.
+    - 논문에서 “primary control over sparse temporal attention map significantly boosts motion alignment”라고 강조하고 있다.
+
+## Motion Representation
+
+### Temporal attention map based motion representation
+
+## 1. Temporal Attention Map 정의
+
+$$A_t^{\text{ref}} \in \mathbb{R}^{(1 \times h \times w) \times f \times f}$$
+
+- $A_t^{\text{ref}}$: 참조(reference) 비디오에서 t 스텝에서 얻어진 **temporal attention map**.
+- 각 위치 p, 프레임 간 i,j 쌍에 대해 $[A_t^{\text{ref}}]_{p, i, j}$는 **프레임 i와 j 간의 연관성**을 나타냄.
+- Softmax를 거쳤기 때문에 $[A_t^{\text{ref}}]_{p, i, j} = 1$
+    
+    즉, 프레임 i가 프레임 j에 얼마나 주의를 기울이는지를 표현함.
+    
+
+## 2. Motion Guidance via Attention Distance (Eq. 4)
+
+![mask.png](/static/images/motionclone/mask.png)
+
+- 생성된 비디오의 attention map $A_t^{\text{gen}}$이 참조 영상의 attention map $A_t^{\text{ref}}$ 에 **가깝도록 유도**.
+- **$M_t$**: sparse temporal mask로, 어떤 위치에서 attention을 **얼마나 강하게 맞춰야 하는지** 결정함.
+    - $M_t \equiv 1$ 이면 **Plain Control**: 전체 attention map에 대해 제약을 가함.
+    - Sparse할수록 필요한 부분만 맞추도록 유도 (**Primary Control**).
+
+---
+
+## 3. Sparse Mask $M_t$ 생성
+
+$$\begin{cases}
+1, & \text{if } [A_t^{\text{ref}}]_{p, i, j} \in \Omega^t_{p, i} \\
+0, & \text{otherwise}
+\end{cases}$$
+
+- $\Omega^t_{p, i}$: attention 값이 높은 top-k 프레임 인덱스 j들의 집합.
+- 결과적으로 $M_t$는 **중요한 모션 상호작용만 유지**하는 **희소한 마스크**가 됨.
+- k=1이면 가장 강한 attention 연결 하나만 사용 → 매우 희소(sparse).
+
+---
+
+## 4. Sparse Representation $H_{t_\alpha} = \{L_{t_\alpha}, M_{t_\alpha}\}$ 도입
+
+### 문제점:
+
+- 실제 비디오에서 $A_t^{\text{ref}}, M_t$을 얻으려면 **비싼 inversion 과정**이 필요.
+- 시간 축마다 다르게 계산되므로 **공간/시간적 비용 매우 큼**.
+
+### 해결방법:
+
+- 고정된 특정 시점 $t_\alpha$ (예: t=200~600)에서만 attention 정보를 수집.
+- 이때,
+    - $L_{t_\alpha} = M_{t_\alpha} \cdot A_{t_\alpha}^{\text{ref}}$
+    - 즉, $A^{\text{ref}}$ 를 sparse mask와 곱해 **중요한 모션 부분만 추출**.
+- 이렇게 구성한 $H_{t_\alpha}$는:
+    - 매우 **희소하고 (sparse)**,
+    - 단 한 번의 노이즈 추가 → denoising으로도 쉽게 얻어짐.
+    - 전체 비디오가 아니라 한 시점만 사용하므로 **비용 절감 + 성능 유지** 가능.
+
+---
+
+### 여기서 주의할 점은
+
+- 초반 denoising 단계 (예: $t_\alpha = 800$)에서는 motion representation  $H_{t_\alpha}$가 실제 모션(예: head-turning)과 불일치할 수 있음.
+- → 너무 noisy한 단계에서는 motion 정보가 왜곡됨.
+    
+    따라서 적절한 t 범위 (예: t=200~600)를 선택하는 것이 중요하다.
+    
+
+| 항목 | 의미 |
+| --- | --- |
+| $A_t^{\text{ref}}$ | 참조 영상의 시점 t에서 temporal attention map |
+| $A_t^{\text{gen}}$ | 생성 중인 영상의 attention map |
+| $M_t$ | top-k attention만 남긴 sparse mask |
+| g | attention 차이를 통한 모션 제약 energy |
+| $L_{t_\alpha}$ | 중요한 attention만 추출한 모션 신호 |
+| $H_{t_\alpha} = \{L, M\}$ | 한 시점의 sparse 모션 표현 (적은 비용으로 추출 가능) |
+
+## Motion Guidance
+
+motion guidance를 주는 방식을 알려면 motionclone 의 전반적인 pipeline을 알아야하는데,
+
+처음 **Reference video는** → motion representation $H_{t_\alpha}$ 생성하고
+
+**Video generation** 에서는→ pre-trained diffusion 모델 + motion guidance 를 사용한다.
+
+즉, motion guidance는 **초기 단계에만 적용한다.**
+
+---
+
+### Motion representation $H_{t_\alpha}$ 추출
+
+> "Given a real reference video, the corresponding motion representation HtαH_{t_\alpha}Htα​​ is obtained by performing a single noise-adding and denoising step."
+> 
+- 영상 전체를 복잡하게 inversion 하지 않음!
+- 대신,
+    - ① 원본 영상을 특정 시점  $t_\alpha$까지 **노이즈 추가**하고
+    - ② 한 번 **denoising**을 수행해서 attention map을 뽑아냄
+- 이 과정을 통해 motion representation $H_{t_\alpha} = \{L_{t_\alpha}, M_{t_\alpha}\}$를 얻음
+
+즉, **단 1-step denoising**으로 저렴하고 효율적인 모션 특징 추출 가능
+
+---
+
+### 생성 과정: 초기 latent → iterative denoising
+
+> "During the video generation process, an initial latent is initialized from a standard Gaussian distribution and subsequently undergoes an iterative denoising procedure via a pre-trained video diffusion model..."
+> 
+- 생성은 diffusion 모델의 기본 구조를 따름:
+    - 무작위 노이즈 (Gaussian) → 여러 단계 denoising → 비디오 샘플
+- 여기에 두 가지 guidance가 들어감:
+    - **Classifier-free guidance (CFG)**: 텍스트 조건 (예: "a cat jumping")
+    - **Motion guidance**: 참조 비디오 기반 모션 정보
+
+---
+
+### 시간 흐름에 따른 이미지 특징 결정 과정
+
+> "Given that image structure is determined in the early steps of the denoising process (Hertz et al., 2022), whereas motion fidelity primarily depends on the structure of each frame..."
+> 
+- 기존 논문 (Hertz et al., 2022)에 따르면:
+    - **초기 denoising 단계 (t 큰 값)**: 이미지의 전체 구조, 윤곽이 정해짐
+    - **후기 단계 (t 작은 값)**: 디테일 조정, 텍스처 보정
+- 즉, **motion fidelity**는 이미 각 프레임의 구조가 정해지고 난 이후에 fine-tune 하기 어렵다는 뜻
+
+---
+
+### Motion guidance는 "초기 denoising 단계에만" 적용
+
+> "motion guidance only involves the early denoising steps, allowing for sufficient flexibility for semantic adjustment..."
+> 
+- **Motion guidance를 너무 뒤까지 강제하면**:
+    - 디테일한 텍스트 조건 (예: "wearing a red hat") 반영을 방해할 수 있음
+- 그래서:
+    - 초기 단계 (e.g., t=800 ~ t=400)에만 motion guidance를 적용해서
+    - 구조적인 모션만 가이드하고
+    - 이후 단계는 자유롭게 텍스트와 세부 디테일 맞추도록 둔다.
+
+---
+
+### 결과적으로 motion fidelity + textual alignment 에 뛰어남
+
+> "...thus empowering premium video generation with compelling motion fidelity and precise textual alignment."
+> 
+- 이 구조 덕분에:
+    - 참조 영상과 **정확히 비슷한 모션 복제 (motion fidelity)** 달성
+    - 동시에 **텍스트 조건에 맞는 외형/배경/디테일 표현 (textual alignment)** 도 잘 됨

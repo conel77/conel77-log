@@ -70,7 +70,7 @@ synthetic anomaly image generation은 **Perlin 노이즈 마스크**를 이진�
 
 그 다음 단계에서는 실제 결함이 존재하는 영역을 나타내는 **ground truth 마스크** $M_{\text{gt}}$를 기준으로, 해당 영역들을 $M_t$에서 제거함으로써, **합성 이상을 삽입할 수 있는 영역만을 담은 마스크** $M_a$를 생성한다. **비지도 학습 환경**에서는 학습 과정에서 $M_{\text{gt}}$가 항상 비어 있으므로, $M_a$는 단순히 $M_t$와 동일하게 처리된다.
 
-이후에는 가우시안 분포 $\mathcal{N}(\mu, \sigma^2)$에서 샘플링한 노이즈 $\text{\varepsilon}$를 $M_a$로 정의된 영역에만 선택적으로 적용하고, 이 노이즈를 adaptation된 feature map $A$에 더하여 변형된 특징 맵 $P$를 생성한다.
+이후에는 가우시안 분포 $\mathcal{N}(\mu, \sigma^2)$에서 샘플링한 노이즈 $\varepsilon$를 $M_a$로 정의된 영역에만 선택적으로 적용하고, 이 노이즈를 adaptation된 feature map $A$에 더하여 변형된 특징 맵 $P$를 생성한다.
 
 모델의 학습 안정성을 높이기 위해 adaptation된 feature map $A$를 복제하여 두 버전을 유지하면서, **기존 SimpleNet과 달리 원본과 복사본 모두에 노이즈를 적용하는 방식**으로 설계하였다.
 이를 통해 SuperSimpleNet은 보다 정밀하고 spatial coherence을 가지면서도 **무작위성이 높은 이상 영역**을 생성할 수 있도록 한다.

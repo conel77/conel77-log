@@ -14,6 +14,8 @@ summary: "supervised & unsupervised 환경에서 모두 anomaly detection 이 �
 
 ## Introduction
 
+![intro.png](/static/images/supersimplenet/intro.png)
+
 이상 탐지 모델이 산업 환경에서 실질적으로 사용되기 위해서는 두 가지 핵심 요구사항을 충족해야한다.  바로 **성능(performance)과 유연성(flexibility)이다.** 
 
 먼저, **성능**은 모델의 이상 탐지 정확도와 추론 속도를 의미한다. 모델은 높은 이상 탐지 성능(AUROC 등)을 달성해야 하며, 동시에 실시간 처리 요구를 만족할 수 있는 **빠른 inference 시간**을 제공해야 한다. 이 성능 측면은 이미 기존 연구들에서 많이 다뤄지고 있다. 
@@ -33,6 +35,8 @@ summary: "supervised & unsupervised 환경에서 모두 anomaly detection 이 �
 
 ## Overall Method
 
+![method.png](/static/images/supersimplenet/method.png)
+
 제안된 **SuperSimpleNet**은 모델이름에서도 보이는 것과 같이, 기존의 SimpleNet을 기반으로 설계되었다. 이 모델은 먼저 pre-trained된 합성곱 신경망을 통해 feature extraction 을 진행하는 것으로 시작한다. 이후 업스케일링과 풀링 과정을 거쳐 context information을 포괄하도록 설계된다(이게 simplenet 에서 더 추가한 점).
 
 이렇게 얻어진 특징은 latent feature로 변환되며, 이는 **feature adaptor** 모듈을 통해 이루어진다(이건 동일). 그리고 하나 더 개선한 점은 synthetic anomaly를 생성하는 기법을 도입하였으며, 이는 비지도 및 지도 학습 환경 모두에서 성능 향상에 핵심적인 역할을 한다.
@@ -47,7 +51,7 @@ synthetic anomaly image generation은 **Perlin 노이즈 마스크**를 이진�
 
 그러나 ResNet 계열 네트워크의 구조적 특성상, 출력되는 feature map은 상대적으로 **해상도가 낮다**. 이로 인해 작은 anomaly에 대한 탐지 성능이 떨어지며, anomaly 영역의 segmentation에도 한계가 발생한다.
 
-이러한 문제를 해결하기 위해, 본 연구에서는 기존 SimpleNet의 feature extraction 구조를 확장하였다. 구체적으로는, feature를 concatenation하기 전에 새로운 **업스케일링(upscaling)**을 진행하였다. 기존 방식보다 한 단계 더 확장된 업스케일링을 수행함으로써, **layer3는 4배**, **layer2는 2배** 크기로 확대되도록 구성하였다.
+이러한 문제를 해결하기 위해, 본 연구에서는 기존 SimpleNet의 feature extraction 구조를 확장하였다. 구체적으로는, feature를 concatenation하기 전에 새로운 업스케일링(upscaling)을 진행하였다. 기존 방식보다 한 단계 더 확장된 업스케일링을 수행함으로써, **layer3는 4배**, **layer2는 2배** 크기로 확대되도록 구성하였다.
 
 이 방식은 두 계층의 해상도를 **동일한 크기**로 맞추어 병합할 수 있도록 하며, 정보 손실 없이 부드럽게 결합(concatenate)될 수 있다고 한다. 
 
@@ -56,6 +60,8 @@ synthetic anomaly image generation은 **Perlin 노이즈 마스크**를 이진�
 그 이후에 adapter를 달아서 simplenet이랑 동일하게 ~ pretrained 된 backbone 에서 feature를 효과적으로 anomaly detection 과제에서 adaptation 할 수 있도록 linear layer 추가한게 끝 
 
 ## Feature-space anomaly generation
+
+![mask.png](/static/images/supersimplenet/mask.png)
 
 기존 SimpleNet은 normal feature에 단순 Perlin noise를 뿌려서 anomaly feature를 만들었다.  
 그럼 SuperSimpleNet에서는 이를 어떻게 개선한 걸까?
@@ -94,6 +100,8 @@ $D_{\text{cls}}$ 의 구조는 단순하며, 5×5 커널을 가진 convolutional
 이러한 구조적 확장은 SuperSimpleNet이 **픽셀 수준의 분할 정보**뿐만 아니라 **이미지 전체의 의미적 맥락**도 함께 고려할 수 있도록 하여, **더 정확하고 안정적인 이상 탐지 성능**을 달성할 수 있다고 한다. 
 
 ## Experiments
+
+![result.png](/static/images/supersimplenet/result.png)
 
 요즘은 단순 mvtec만 성능 올리는 거는 택도 없기 때문에, 다양한 데이터셋을 끌어와서 성능 평가를 진행한 것 같다. 정말 오랜만에 보는 gray-scale의 Kolektor Surface-Defect Dataset2(KSDD2)부터 VisA까지.. 다양하게 실험을 진행했고 여기서 supersimplenet의 point 는 supervised 까지 가능하다는 점이기 때문에 이에 대한 실험들도 다른 네트워크까지 포함해서 다양하게 한 것 같다.
 

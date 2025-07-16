@@ -1,0 +1,98 @@
+---
+title: "SuperSimpleNet: Unifying Unsupervised and Supervised Learning for Fast and Reliable Surface Defect Detection(ICLR2024)"
+date: "2025-07-10"
+tags: ['anomaly detection', 'simplenet', 'unsupervised', 'supervised']
+draft: false
+summary: "supervised & unsupervised 환경에서 모두 anomaly detection 이 가능한 안정된 높은 성능의 이상 탐지 모델 리뷰"
+---
+
+# SuperSimpleNet: Unifying Unsupervised and Supervised Learning for Fast and Reliable Surface Defect Detection
+
+최근 anomaly detection 관련 과제를 시작하게됐는데, 2023년 후반에 simplenet 을 개선하려고 코드까지 뜯어봤었는데 이를 개선한 supersimplenet 이 ICLR 2024년도에 나온 소식을 듣고 서둘러 논문을 읽어봤다.
+
+개인적인 견해로는 별로 달라진게 없는(?) 아주 단순한 네트워크에 더 단순한 방식을 추가해서 supervised anomaly detection 까지 가능하게 한 모델이라.. 아쉬움이 있지만 간단하지만 성능이 잘 나오는 네트워크이기에 리뷰해보려고한다 !
+
+## Introduction
+
+이상 탐지 모델이 산업 환경에서 실질적으로 사용되기 위해서는 두 가지 핵심 요구사항을 충족해야한다.  바로 **성능(performance)과 유연성(flexibility)이다.** 
+
+먼저, **성능**은 모델의 이상 탐지 정확도와 추론 속도를 의미한다. 모델은 높은 이상 탐지 성능(AUROC 등)을 달성해야 하며, 동시에 실시간 처리 요구를 만족할 수 있는 **빠른 inference 시간**을 제공해야 한다. 이 성능 측면은 이미 기존 연구들에서 많이 다뤄지고 있다. 
+
+반면, **유연성**은 대부분의 기존 연구에서 간과된 부분이다. 실제 제조 현장에서는 다양한 수준의 annotation이 존재하며, 제품 혹은 결함 유형에 따라 일부는 **레이블이 완전한 지도(supervised)** 형태로, 일부는 **레이블이 없는 비지도(unsupervised)** 형태로 제공된다. 따라서, 실제 적용할 수 있는 실용적인 모델은 이처럼 **주석 수준이 다양한 데이터**를 효과적으로 학습에 활용할 수 있어야 하며, **지도 학습과 비지도 학습 모두에 대응 가능한 구조**를 갖추는 것이 필수적이다. 그러나 현재 대부분의 기존 방법은 이러한 양방향 학습 지원이 미흡하다는 것을 문제점으로 짚고 있다.
+
+또 하나 중요한 요소는 학습의 안정성(stability)이다. 동일한 모델과 데이터로 학습을 반복하더라도 **일관된 결과를 제공하는 신뢰성 있는 학습 과정**이 요구되는데, 많은 기존 모델은 훈련 반복(run)에 따라 성능이 크게 달라지는 문제를 안고 있다.
+
+이러한 문제들을 해결하고자 본 연구에서는 다음과 같은 4가지 요구 사항을 모두 만족하는 모델을 목표로 두고 있다.
+
+1. 높은 anomaly detection 과 localization 성능
+2. 10ms 이하의 inference time
+3. 지도 및 비지도 학습 모두에서 동작 가능한 구조
+4. 반복 훈련에서도 일관된 성능을 보장하는 안정적인 학습 과정
+
+이러한 목표를 달성하기 위해, 기존 SimpleNet을 기반으로 개선한 새로운 모델인 **SuperSimpleNet**을 제안했다. SimpleNet은 비지도 학습 설정에서 이미 우수한 성능을 보여준 바 있지만, 반복 학습 시 성능 변동이 심하다는 단점이 있었다. 본 연구에서는 **이러한 한계를 보완**하여, **모델 구조와 학습 방식을 개선**함으로써 실제 산업 응용에 적합한 견고하고 신뢰성 높은 모델을 완성했다.
+
+## Overall Method
+
+제안된 **SuperSimpleNet**은 모델이름에서도 보이는 것과 같이, 기존의 SimpleNet을 기반으로 설계되었다. 이 모델은 먼저 pre-trained된 합성곱 신경망을 통해 feature extraction 을 진행하는 것으로 시작한다. 이후 업스케일링과 풀링 과정을 거쳐 context information을 포괄하도록 설계된다(이게 simplenet 에서 더 추가한 점).
+
+이렇게 얻어진 특징은 latent feature로 변환되며, 이는 **feature adaptor** 모듈을 통해 이루어진다(이건 동일). 그리고 하나 더 개선한 점은 synthetic anomaly를 생성하는 기법을 도입하였으며, 이는 비지도 및 지도 학습 환경 모두에서 성능 향상에 핵심적인 역할을 한다.
+
+synthetic anomaly image generation은 **Perlin 노이즈 마스크**를 이진화하여 latent feature 상에서 이상 영역을 생성하는 방법으로 진행되는데, 이후 정제된 특징은 **segmentation** 및 **classification** 모듈로 전달된다.
+
+이 방식은 unsupervised setting에서는 **합성된 마스크와 레이블**에만 의존하여 학습이 이루어진다(simplenet이랑 그닥 다를게 없음ㅋㅋ). 그러나 이러한 합성 이상 정보를 실제 ground-truth 데이터와 결합할 경우, **지도 학습 환경**에서도 성능을 크게 향상시킨다고 한다.
+
+## Feature extractor
+
+이 feature extractor마저도 기존 SimpleNet의 방식을 그대로 따르며, feature extractor로는 **ImageNet**에서 pre-trained된 ResNet을(WideResNet50) 사용한다. 이 네트워크의 layer2와 **layer3**에서 feature extraction 을 진행한다.
+
+그러나 ResNet 계열 네트워크의 구조적 특성상, 출력되는 feature map은 상대적으로 **해상도가 낮다**. 이로 인해 작은 anomaly에 대한 탐지 성능이 떨어지며, anomaly 영역의 segmentation에도 한계가 발생한다.
+
+이러한 문제를 해결하기 위해, 본 연구에서는 기존 SimpleNet의 feature extraction 구조를 확장하였다. 구체적으로는, feature를 concatenation하기 전에 새로운 **업스케일링(upscaling)**을 진행하였다. 기존 방식보다 한 단계 더 확장된 업스케일링을 수행함으로써, **layer3는 4배**, **layer2는 2배** 크기로 확대되도록 구성하였다.
+
+이 방식은 두 계층의 해상도를 **동일한 크기**로 맞추어 병합할 수 있도록 하며, 정보 손실 없이 부드럽게 결합(concatenate)될 수 있다고 한다. 
+
+이후에는 기존 SimpleNet과 마찬가지로, 주변 문맥 정보를 고려하기 위해 3×3 mean kernel을 이용한 local average pooling을 적용한다. 이 과정을 통해 얻어진 업스케일된 특징 맵은 **각 위치가 주변 정보를 함께 포함하는** 강화된 표현을 갖게 된다.
+
+그 이후에 adapter를 달아서 simplenet이랑 동일하게 ~ pretrained 된 backbone 에서 feature를 효과적으로 anomaly detection 과제에서 adaptation 할 수 있도록 linear layer 추가한게 끝 
+
+## Feature-space anomaly generation
+
+기존 simplenet은 normal feature 에다가 단순 perlin noise를 뿌려서 anoamly feature를 만들었다. 그럼 supersimplenet에서는 어떻게 이를 개선한걸까? 일단 **Perlin noise 이미지** M_p를 생성한 후, 이에 threshold을 적용하여 **binary mask** M_t를 만드는 것으로 시작된다. 이러한 방식은 기존 연구들과 유사하다.
+
+그 다음 단계에서는 실제 결함이 존재하는 영역을 나타내는 **ground truth 마스크** M_{gt}를 기준으로, 해당 영역들을 M_t에서 제거함으로써, **합성 이상을 삽입할 수 있는 영역만을 담은 마스크** M_a를 생성한다. **비지도 학습 환경**에서는 학습 과정에서 M_{gt}가 항상 비어 있으므로, M_a는 단순히 M_t와 동일하게 처리된다.
+
+이후에는 가우시안 분포 $N(\mu, \sigma^2)$ 에서 샘플링한 노이즈 $\varepsilon$ 를 M_a로 정의된 영역에만 선택적으로 적용하며, 이 노이즈를 adaptation된 feature map A에 더하여 변형된 특징 맵 P를 생성한다.
+
+모델의 학습 안정성을 높이기 위해, adaptation된 feature map A를 복제하여 두 버전을 유지하면서, **기존 SimpleNet과 달리 원본과 복사본 모두에 노이즈를 적용하는 방식**으로 설계하였다. 이 **정교한 이상 삽입 전략**을 통해 SuperSimpleNet은 보다 정밀하고 spatial coherence을 가지면서도 **무작위성이 높은 이상 영역**을 생성할 수 있도록 한다. 
+
+이처럼 높은 무작위성은 모델이 **특정 패턴에 과도하게 의존하지 않도록** 방지한다는 이점을 지닌다.
+
+(매우 단순한 방식인데 효과가 좋은 것 같다)
+
+---
+
+supervised setting에서는 단순히 위의 과정에서 사용한M_a를 실제 ground truth 마스크 M_{gt}로 대체하는 방식이 직관적으로 떠오를 수 있다. 그러나 본 논문에서는 실제 학습 데이터에 존재하는 결함들이 **현실 세계의 결함 분포 전체를 대표하기에는 부족하다**는 점을 들고 있다. (그냥 gt 마스크만 사용해서 학습하기에는 다른 다양한 anomaly 들이 나올 때 이를 detect하기 부족하다는 말)
+
+이 한계를 극복하기 위해, 비지도 설정에서 사용한 방식과 동일한 절차로 생성한 anomalies을 지도 학습에도 추가로 적용하였다. 다만, **가우시안 노이즈는 실제 결함이 없는 영역에만 삽입**함으로써, 모델이 **실제 결함 데이터의 정보를 최대한 활용**할 수 있도록 하였다.
+
+그 결과, 지도 학습 환경에서 사용되는 최종 이상 마스크 M는 실제 ground truth 마스크와 합성 이상 마스크를 **혼합한 형태로 구성**되며, 이를 통해 모델은 보다 **다양한 결함 형태**를 학습할 수 있게 된다. 이 전략은 모델의 **탐지 성능과 일반화 능력**을 크게 향상시킨다고 한다. 
+
+## Segmentation-detection module
+
+SuperSimpleNet은 이상 탐지 성능을 더욱 향상시키기 위해, 기존 SimpleNet의 **segmentation head**인 $D_{\text{seg}}$ 를 유지하면서 **추가적인 classification head**, 즉 $D_{\text{cls}}$ 를 새롭게 도입하였다. 이 classification head는 이미지 수준에서의 global semantics를 파악함으로써, 이상 탐지 결과의 신뢰도를 높이기 위한 역할을 수행한다.
+
+$D_{\text{cls}}$ 의 구조는 단순하며, 5×5 커널을 가진 convolutional block과 그 뒤를 잇는 linear layer로 구성되어 있다. 이 구조는 **이미지 전체의 전역적 문맥**을 이해하는 데 도움을 주며, 결과적으로 false positive의 수를 줄이는 데 기여한다. 또한 작은 영역에서 발생하는 **미세한 변화**를 감지하는 데에도 효과적이어서, 이전에는 놓쳤을 수 있는 small anomalies에 대한 탐지율을 높일 수 있다고한다. 
+
+먼저 segmentation head를 통해 이상 마스크 $M_o$ 가 생성된다. 이 마스크 M_o는 적응된 특징 맵 A (또는 학습 중일 경우에는 노이즈가 추가된 특징 맵 P)과 함께 concatenate되어 classification head의 합성곱 블록에 입력된다.
+
+그 다음, 합성곱 블록의 출력과 이상 마스크 M_o는 각각 average pooling과 max pooling을 거친다. 이후 이 두 결과를 **결합하여 하나의 벡터**로 만들고, 이를 최종 선형 계층에 전달함으로써 이미지 단위의 이상 점수 s를 출력한다.
+
+이러한 구조적 확장은 SuperSimpleNet이 **픽셀 수준의 분할 정보**뿐만 아니라 **이미지 전체의 의미적 맥락**도 함께 고려할 수 있도록 하여, **더 정확하고 안정적인 이상 탐지 성능**을 달성할 수 있다고 한다. 
+
+## Experiments
+
+요즘은 단순 mvtec만 성능 올리는 거는 택도 없기 때문에, 다양한 데이터셋을 끌어와서 성능 평가를 진행한 것 같다. 정말 오랜만에 보는 gray-scale의 Kolektor Surface-Defect Dataset2(KSDD2)부터 VisA까지.. 다양하게 실험을 진행했고 여기서 supersimplenet의 point 는 supervised 까지 가능하다는 점이기 때문에 이에 대한 실험들도 다른 네트워크까지 포함해서 다양하게 한 것 같다.
+
+한가지 아쉬운 점은 다른 모델 비교를 지금으로 치면은 좀 예전 모델을 가져다가 성능평가를 했다는 점(아마 다른 모델들이 ..성능이 너무 높아서 그런거일수도..? 코드가 없다거나 supervised 환경을 못만들었을 수도 있을 것 같다)
+
+아무튼 그런 모델들에 비해서 supervised적으로도, unsupervised적으로도 안정적인 높은 성능을 도달하였다고 주장하고 있다.

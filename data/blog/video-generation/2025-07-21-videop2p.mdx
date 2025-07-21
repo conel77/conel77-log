@@ -14,6 +14,8 @@ Text로 특정한 상황을 주었을 때, 이에 대한 비디오 생성이 주
 
 ## Introduction
 
+![intro.png](/static/images/video-p2p/intro.png)
+
 본 논문에서는 이러한 attention control 기반의 이미지 편집 기법을 영상에도 적용하는 프레임워크를 제안한다. 현재 공개된 대규모 pre-trained된 비디오 생성 모델이 없기 때문에(이 당시에는 2023년도라, 지금은 넘쳐난다…), 이미지 생성 모델을 영상 편집에 적합하도록 변형하는 방법을 사용하였다. 기존에는 이미지 모델을 프레임 단위로 각각 처리하는 방식인 Image-P2P를 사용하였지만, 이는 프레임 간 semantic consistency가 부족하다는 단점이 있다. 이러한 문제를 해결하기 위해, 본 논문에서는 Text-to-Image(T2I) 모델을 Text-to-Set(T2S) 모델로 변형하여 모든 프레임에 대해 일관된 attention control을 적용하는 구조를 제안한다.
 
 T2I 모델을 T2S 모델로 변환하기 위해서는 기존의 convolution kernel을 확장하고 self-attention을 frame-attention으로 교체하는 방식을 사용한다. 이와 같은 구조 변화는 모델이 여러 장의 이미지(즉, 비디오 프레임)를 동시에 일관성 있게 생성할 수 있도록 해준다. 이 과정에서 일시적으로 generation quality이 저하되지만, 원본 비디오에 대해 모델을 tuning하면 품질이 회복된다. 비록 tuning한 T2S 모델이 완전한 비디오 생성 모델은 아니지만, 영상의 잠재 표현을 근사적으로 복원하기에는 충분한 수준이다. 다만, denoising 과정에서 오차가 누적되는 현상은 여전히 존재하며, 이는 기존 연구들에서 이에 대한 문제를 잘 제기하고 있다. (그럼 해결해야하겠지?)
@@ -23,6 +25,8 @@ T2I 모델을 T2S 모델로 변환하기 위해서는 기존의 convolution kern
 본 논문을 이해하려면, Null-text inversion 과 DDIM inversion에 대해 잘 알고 있어야한다.
 
 ## Method
+
+![method.png](/static/images/video-p2p/method.png)
 
 실제 영상(Real Video) V가 n개의 프레임을 포함하고 있을 때, 이를 텍스트 기반으로 편집하기 위한 **Video-P2P (Prompt-to-Prompt for Video)** 프레임워크를 기본적으로 사용하고 있다. 이 프레임워크는 사용자가 제공한 원본 프롬프트 P와 편집 프롬프트 $P^*$ 를 기반으로 하여, 원본 영상 V로부터 편집된 영상 $V^*$ 를 생성하는 것을 목표로 한다. 이때 편집된 영상 역시 원본과 동일하게 n개의 프레임을 가진다.
 
@@ -96,6 +100,8 @@ Video inversion 을 통해 매 프레임마다의 일관성을 유지할 수 있
 반면, **초기화된 unconditional embedding**을 사용할 경우 완벽한 복원은 어렵지만 **편집 가능성은 크게 향상**된다는 사실을 발견했다. 이로부터 두 가지 파이프라인의 장점을 결합하는 아이디어가 나오게 되는데,  즉, 원본 프롬프트(source prompt)에서는 최적화된 embedding을 사용하고, target prompt에서는 초기 embedding을 사용하여, 각 프롬프트의 강점을 살리는 방식을 사용한다.
 
 즉, classifier-free guidance 과정에서 **source branch는 reconstruction을 담당**하고, **target branch는 editing을 담당**하게 된다. 이후 두 branch에서 생성된 attention map을 통합하여, 변경되지 않은 영역은 source branch의 영향을, 변경이 필요한 영역은 target branch의 영향을 받도록 한다. 이렇게 되면 바뀌어야할 object나 category만 변경되고, 나머지는 일관되게 유지가 되는 방식 !
+
+![algorithm.png](/static/images/video-p2p/algorithm.png)
 
 이 과정을 요약한 pseudo algorithm은 다음과 같으며, 이는 기존 Image-P2P에서 사용된 attention control 방식을 Video-P2P에 확장 적용한 것이다. 예를 들어, 특정 단어를 교체하는 **word swap**을 수행할 때는, attention map을 일정 시점까지 target branch의 것으로 대체하는 방식으로 편집을 수행한다. 
 

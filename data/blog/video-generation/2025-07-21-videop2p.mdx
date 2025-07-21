@@ -1,0 +1,114 @@
+---
+title: "Video-P2P: Video Editing with Cross-attention Control(CVPR2024)"
+date: "2025-07-21"
+tags: ['video generation', 'diffusion', 'prompt-to-promt', 'null text inversion', 'DDIM inversion']
+draft: false
+summary: "pre-trained된 video diffusion 이 없을 시절... image diffusion 을 활용하여 text-driven video editing 을 성공시킨 논문 리뷰"
+---
+
+# Video-P2P: Video Editing with Cross-attention Control
+
+Text로 특정한 상황을 주었을 때, 이에 대한 비디오 생성이 주된 분야로 자리잡고있다. Prompt-to-prompt와 같이 이미지를 text editing 을 통해 control 할 때는 성능이 좋았던 모델을 가지고 비디오를 생성하려 하면, semantic consistency 가 떨어지고 매 프레임마다 다른 이미지가 나오는 문제점을 지니고 있다. 
+
+이런 분야를 text-driven image editing 이라고 하며, 이런 task의 모델들은 타겟 컨텐츠의 특정 object 나 category를 수정된 text에 맞게 바꿔주는 방식을 진행할 수 있다. 기존의 모델들에서는 주로 diffusion model을 사용하며, 이 중에서도 attention control 방식이 가장 detail하게 좋은 결과를 도출하고 있다. 이 방식은 먼저 원본 이미지를 pre-trained된 diffusion 모델의 latent space로 변환한 후, denoising 과정에서 attention map을 조작하여 특정 객체나 속성을 변경하는 방식이다. 예를 들어, "child"에 해당하는 attention map을 "panda"의 map으로 교체하면 이미지 상의 아이가 팬더로 대체되는 결과를 얻을 수 있는 것!
+
+## Introduction
+
+본 논문에서는 이러한 attention control 기반의 이미지 편집 기법을 영상에도 적용하는 프레임워크를 제안한다. 현재 공개된 대규모 pre-trained된 비디오 생성 모델이 없기 때문에(이 당시에는 2023년도라, 지금은 넘쳐난다…), 이미지 생성 모델을 영상 편집에 적합하도록 변형하는 방법을 사용하였다. 기존에는 이미지 모델을 프레임 단위로 각각 처리하는 방식인 Image-P2P를 사용하였지만, 이는 프레임 간 semantic consistency가 부족하다는 단점이 있다. 이러한 문제를 해결하기 위해, 본 논문에서는 Text-to-Image(T2I) 모델을 Text-to-Set(T2S) 모델로 변형하여 모든 프레임에 대해 일관된 attention control을 적용하는 구조를 제안한다.
+
+T2I 모델을 T2S 모델로 변환하기 위해서는 기존의 convolution kernel을 확장하고 self-attention을 frame-attention으로 교체하는 방식을 사용한다. 이와 같은 구조 변화는 모델이 여러 장의 이미지(즉, 비디오 프레임)를 동시에 일관성 있게 생성할 수 있도록 해준다. 이 과정에서 일시적으로 generation quality이 저하되지만, 원본 비디오에 대해 모델을 tuning하면 품질이 회복된다. 비록 tuning한 T2S 모델이 완전한 비디오 생성 모델은 아니지만, 영상의 잠재 표현을 근사적으로 복원하기에는 충분한 수준이다. 다만, denoising 과정에서 오차가 누적되는 현상은 여전히 존재하며, 이는 기존 연구들에서 이에 대한 문제를 잘 제기하고 있다. (그럼 해결해야하겠지?)
+
+이러한 inversion 품질을 더욱 향상시키기 위해, 본 논문은 모든 프레임에 대해 shared unconditional embedding을 최적화하는 방식을 제안한다. 이 shared embedding은 denoising 과정에서 생성되는 latent feature와 원래 diffusion latent 간의 정렬을 가능하게 하며, 전체 영상의 표현을 전반적으로 조율하는 데 중요한 역할을 한다. 실험 결과, 이 shared embedding 방식이 영상의 inversion 품질을 향상시키는 데 효과적이며, 영상 편집의 핵심적인 요소로 작용함을 보여준다. 더 자세하게 알아보자. 
+
+본 논문을 이해하려면, Null-text inversion 과 DDIM inversion에 대해 잘 알고 있어야한다.
+
+## Method
+
+실제 영상(Real Video) V가 n개의 프레임을 포함하고 있을 때, 이를 텍스트 기반으로 편집하기 위한 **Video-P2P (Prompt-to-Prompt for Video)** 프레임워크를 기본적으로 사용하고 있다. 이 프레임워크는 사용자가 제공한 원본 프롬프트 P와 편집 프롬프트 $P^*$ 를 기반으로 하여, 원본 영상 V로부터 편집된 영상 $V^*$ 를 생성하는 것을 목표로 한다. 이때 편집된 영상 역시 원본과 동일하게 n개의 프레임을 가진다.
+
+여기서 사용하는 Prompt-to-Prompt(P2P)란, 두 개의 텍스트 프롬프트 사이에서 cross-attention을 조절하여 객체나 속성의 변화만을 반영하고, 나머지 장면 구성은 유지한 채 이미지를 조절하는 방식이다. 여기서는 구성 자체를 TAV(Text-Aware Video Editing)에서 제안한 것과 유사하게 가져갔으며, 이 논문에서는 object of interest가 영상의 첫 프레임에 존재한다고 가정한다. 이는 모델이 초기 attention을 추적하거나 정렬하는 데 도움이 되는 조건이라고 한다. 
+
+이러한 편집을 영상에 적용하기 위해 **Video-P2P**라는 프레임워크를 설계하고, 그 핵심 기술적 요소로 두 가지를 제시한다.
+
+1. **video inversion을 위한 shared unconditional embedding 최적화**
+    
+    이는 영상의 각 프레임을 diffusion 모델의 latent 공간으로 변환하는 과정에서 모든 프레임에 대해 **하나의 동일한 unconditional embedding을 공유**함으로써, 전체 영상의 semantic consistency를 유지하고자 한다. 일반적으로 diffusion inversion은 프레임마다 따로 수행하면 일관성이 깨지기 쉬운데, unconditional embedding을 공유하면 프레임들 간의 표현이 통합되고 일관된 결과를 유도할 수 있다.
+    
+2. **원본 프롬프트와 editing 프롬프트에 대해 서로 다른 guidance 및 attention map 통합**
+    
+    이 항목은 Prompt-to-Prompt 기법의 핵심 아이디어를 영상에 맞게 확장한 것이다. 원본 프롬프트 P는 원래 객체와 장면 구성을 반영하고, 편집 프롬프트 $P^*$ 는 변경된 객체(예: "a panda instead of a child")를 포함한다. 이때 두 프롬프트에서 생성되는 **cross-attention map을 비교 및 통합**함으로써, 어떤 부분을 바꾸고 어떤 부분은 유지할지를 조절한다. 즉, **원본 attention map을 기반으로 편집 위치를 식별하고**, **편집 프롬프트의 attention map으로 해당 위치에 새로운 객체 정보를 반영**하는 방식이다.
+    
+
+### Video Inversion
+
+T2I(Text-to-Image) 모델을 T2S(Text-to-Set) 구조로 변형하고, 이에 기반한 inversion 기법을 설계한다.
+
+먼저, **approximate inversion**이 가능한 T2S 모델을 구축한다.
+
+T2S 모델은 기존 diffusion 모델에 아래와 같은 두가지 수정 과정을 진행한다.
+
+1. **1×3×3 convolution kernel 사용**
+    - TAV논문에서 사용된 구조로, spatial 정보와 시간 축 방향의 컨볼루션을 동시에 처리할 수 있도록 설계되어 있다.
+    - 비디오 특징인 시간 연속을 다룰 수 있다.
+2. **Self-Attention → Frame-Attention으로 대체**
+    - 기존 T2I 모델의 self-attention은 각 프레임 내의 관계만 보지만, frame-attention은 다른 프레임과의 관계를 반영한다.
+    - 특히, 프레임 $v_i$를 업데이트할 때 항상 첫 번째 프레임 $v_0$을 기준으로 attention을 계산한다.
+
+---
+
+Frame-attention은 다음과 같이 구성된다.
+
+- Query는 현재 프레임 v_i로부터 계산:
+    
+    $Q = W^Q v_i$
+    
+- Key, Value는 항상 첫 번째 프레임 $v_0$로부터 계산:
+    
+    $K = W^K v_0, \quad V = W^V v_0$
+    
+- Attention map은 다음과 같이 계산됨:
+    
+    $M = \text{Softmax} \left( \frac{Q K^T}{\sqrt{d}} \right)$
+    
+    여기서 d는 latent feature의 차원이다.
+    
+
+이 연산은 영상의 모든 프레임에 대해 반복적으로 수행되며, 총 n번의 계산으로 n개의 attention map이 생성된다. 이 방식은 **메모리를 절약하고 계산 속도를 빠르게 하며**, 기본적인 시간적 일관성을 유지할 수 있게 한다.
+
+---
+
+기존 T2I 모델을 T2S로 변형하는 과정에서, self-attention을 frame-attention으로 바꾸는 것을 model inflation이라 부른다.
+
+하지만 이 변경은 **pre-trained되지 않은 frame-attention 파라미터**를 사용하기 때문에, 초기에는 영상 일관성은 유지되지만 **프레임 개별 품질이 저하되는 문제**가 발생한다. 이 문제를 해결하기 위해 다음과 같은fine-tuning을 수행한다. 
+
+일단 Frame-attention과 cross-attention의 **Query projection matrix $W^Q$와 Temporal attention 모듈을 조정하여 입력 비디오를 기반으로 정확한 노이즈 예측을 수행하도록 T2S모델 튜닝을 목적으로, approximate video inversion을 진행한다.** 
+
+**이 과정에서 shared unconditional embedding**을 최적화하며, Diffusion Latent $z_t$ 는 각 시간 스텝마다 n개의 프레임 채널을 가진다. 즉, $z_{t,i}$ 는 t단계의 i번째 프레임에 대한 latent feature를 의미하며 **DDIM Inversion** 방식을 활용해 $z_0^*, z_1^*, \dots, z_T^*$ 와 같은 latent feature들을 생성한다.
+
+Video inversion 을 통해 매 프레임마다의 일관성을 유지할 수 있게 되었다.
+
+### Decoupled-guidance Attention Control
+
+이실제 영상에 대해 attention control을 수행하기 위한 infernece는 어떻게 바뀌었을까? 기존 연구들에서는 이미지 편집을 위해 reconstruction ability와 editability을 동시에 갖춘 추론 파이프라인이 필요하다고 주장한다. 하지만 T2S(Text-to-Set) 모델의 경우, 비디오 기반 pre-trained된 모델들이 없어서 그런 정보들이 부족하기 때문에 T2I(Text-to-Image) 모델만큼 강력한 추론 파이프라인을 갖추기 어렵다.
+
+논문에서는 video inversion을 통해 원본 영상을 재구성할 수 있는 파이프라인을 구성하는 데는 성공하지만, 이때 **shared unconditional embedding을 최적화**하게 되면 editability가 저하되는 문제가 발생한다. 즉, 영상은 잘 복원되지만, 새로운 프롬프트로 객체나 속성을 바꾸려고 하면 생성 품질이 떨어지는 것이다. 이는 T2S 모델의 편집 능력이 최적화된 embedding에 의해 제한받기 때문이며, 그 원인은 영상 기반 학습이 충분하지 않아 프롬프트 변화에 대한 일반화 능력이 부족하기 때문이다.
+
+반면, **초기화된 unconditional embedding**을 사용할 경우 완벽한 복원은 어렵지만 **편집 가능성은 크게 향상**된다는 사실을 발견했다. 이로부터 두 가지 파이프라인의 장점을 결합하는 아이디어가 나오게 되는데,  즉, 원본 프롬프트(source prompt)에서는 최적화된 embedding을 사용하고, target prompt에서는 초기 embedding을 사용하여, 각 프롬프트의 강점을 살리는 방식을 사용한다.
+
+즉, classifier-free guidance 과정에서 **source branch는 reconstruction을 담당**하고, **target branch는 editing을 담당**하게 된다. 이후 두 branch에서 생성된 attention map을 통합하여, 변경되지 않은 영역은 source branch의 영향을, 변경이 필요한 영역은 target branch의 영향을 받도록 한다. 이렇게 되면 바뀌어야할 object나 category만 변경되고, 나머지는 일관되게 유지가 되는 방식 !
+
+이 과정을 요약한 pseudo algorithm은 다음과 같으며, 이는 기존 Image-P2P에서 사용된 attention control 방식을 Video-P2P에 확장 적용한 것이다. 예를 들어, 특정 단어를 교체하는 **word swap**을 수행할 때는, attention map을 일정 시점까지 target branch의 것으로 대체하는 방식으로 편집을 수행한다. 
+
+$\text{Edit}(M_t, M_t^*, t) :=
+\begin{cases}
+M_t^* & \text{if } t < \tau \\
+M_t, & \text{otherwise}
+\end{cases}$
+
+여기서 정의된 Edit 함수는 다음과 같이 작동한다: 
+
+시간 t가 임계값 $\tau$ 보다 작을 경우에는 target attention map $M_t^*$ 를 사용하고, 그 이후에는 source attention map $M_t$ 를 유지한다. 이처럼 attention map은 초기에 형성되는 경향이 있으므로, 앞부분 단계에서의 교체만으로도 효과적인 편집이 가능하다.
+
+또한 각 단어 w에 대한 attention map $M_{t,w}$ 는 시간 단계 T부터 t까지의 평균으로 계산되며, 각 프레임 j에 대해서도 독립적으로 산출된다. 이를 통해 프레임별로 단어 중심의 attention 강도를 정밀하게 반영할 수 있게 된다.
+
+이와 같은 구조는 일부를 유지하려고 하는 성질과 일부를 수정하려고 하는 서로 상충되는 요구를 절충해서, 실제 영상에서도 high quality 의 video editing 이 가능하도록 한다.

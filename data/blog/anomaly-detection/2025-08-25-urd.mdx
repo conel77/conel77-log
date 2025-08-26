@@ -1,0 +1,202 @@
+---
+title: "Unlocking the Potential of Reverse Distillation for Anomaly Detection(AAAI2025)"
+date: "2025-08-25"
+tags: ['anomaly detection', 'RevsedDistillation', 'RD', 'URD', 'KnowledgeDistillation']
+draft: false
+summary: "Reverse Distillation 방식을 활용 및 개선하여 anomaly detection 성능을 높인 URD 논문 리뷰"
+---
+
+# Unlocking the Potential of Reverse Distillation for Anomaly Detection
+
+RD(Reverse distillation)는 KD(Knowledge Distillation)에서 student 의 구조를 인코더에서 디코더로 변형하여 Anomaly Detection(AD)에서 사용되고 있다. 이 방법을 제안한 anomaly detection 과정에서는 사전 학습된 teacher encoder **E**, one-class bottleneck embedding(OCBE) 모듈, 그리고 student decoder **D**로 구성된다. 학습 과정에서는 정상(normal) 이미지만을 입력으로 사용한다. OCBE 모듈은 멀티 스케일 패턴을 저차원 임베딩 공간으로 압축하며, 이 임베딩을 student에 전달하여 teacher feature를 복원하게 된다. inference 과정에서 teacher는 정상 분포에서 벗어나는 이상 특징(anomalous features)을 포착할 수 있고, OCBE는 이러한 이상 정보가 그대로 student에 입력되는 것을 막아준다. 따라서 student는 정상 이미지뿐 아니라 이상 이미지가 입력되더라도 anomaly-free feature를 생성하도록 유도된다. 그렇게 되면 teacher의 피처와 student의 feature 간의 차이가 커지게 되며, 이를 유사도 기반으로 계산하여 anomaly detection 을 진행하는 방식이다. 본 논문에서는 이 RD방식에 대한 문제점을 제시하는데, 
+
+### 1. Miss Detection 문제
+
+RD는 두 가지 핵심 전제를 지니고 있는데, 첫째, teacher는 이상 영역에서 정상 feature와 구별되는 비정상 feature를 생성해야 한다. 그러나 실제 상황에서는 이상 영역이 매우 작거나 receptive field 내에 정상 픽셀이 대부분일 경우 teacher가 이상을 제대로 포착하지 못할 수 있다. 둘째, student는 anomaly-free feature로만 reconstruct한다는 가정인데, RD에서 OCBE는 단순 downsampling을 수행하기 때문에 여전히 비정상 피처가 student 입력에 포함되어 anomaly 한 영역으로 reconstruct될 수 있다. 또한 student decoder는 다층 convolution 구조로 일반화 능력이 강하기 때문에 정상 데이터만으로 학습되더라도 teacher와 유사한 이상 feature를 생성할 수 있다. 이러한 이유로 teacher와 student feature 간 차이가 충분히 발생하지 않아 일부 이상 영역이 탐지되지 못하는 miss detection 문제가 나타난다.
+
+### 2. False Positive 문제
+
+teacher encoder는 여러 단계의 downsampling과 convolution을 지나가기 때문에, 최종 high-level feature는 low-level feature 대비 많은 디테일한 정보가 손실된다. 이 상태에서 high-level feature만을 기반으로 reconstruction을 진행하면 **정상 영역에서도 reconstruction error가 크게 발생하여 false positive가 증가**한다. 전통적인 reconstruction 네트워크에서는 이를 해결하기 위해 skip connection을 활용하여 encoder feature를 decoder에 직접 전달한다. 그러나 RD에서 이러한 방식은 teacher encoder의 비정상 feature가 student decoder로 전달될 위험이 있어 anomaly-free feature 생성을 방해할 수 있다. 
+
+RD는 이를 완화하기 위해 Multi-level Feature Fusion(MFF) 구조를 제안하여 여러 단계의 encoder feature를 통합해 decoder 입력으로 사용한다. 하지만 이 과정에서 feature들이 다시 downsampling되어 세부 정보가 상당 부분 손실되는 문제점을 지닌다. 결국 정상 영역에서도 teacher와 student feature 간 차이가 크게 발생하고, 이는 anomaly detection에서 성능 저하를 일으키는 false positive로 이어지게 된다.
+
+즉, RD는 teacher와 student 간의 feature 차이를 기반으로 anomaly를 탐지하는 구조이지만, teacher가 **anomaly를 충분히 포착하지 못하거나 student가 anomaly-free feature 생성을 보장하지 못하는 상황**이 발생할 수 있다. 또한 MFF 기반 구조는 정상 영역에서도 reconstruction 차이를 유발하여 false positive를 증가시키는 한계를 가진다. 따라서 RD 기반 anomaly detection은 miss detection과 false positive 모두에 취약하며, 이를 해결하기 위해서는 teacher와 student의 feature 전달 및 처리 과정을 정교하게 설계하는 보완 모듈이 필요하게 됨을 지적하고 있다.
+
+# Proposed Method
+
+## Expert-Teacher-Student (E-T-S) Network
+
+위의 아키텍처 그림과 같이, 본 논문에서 제안하는 전체 아키텍처는 RD의 teacher-student framework를 기반으로 하여 **Expert-Teacher-Student (E-T-S) Network**로 확장하였다. 이 구조는 RD의 teacher, bottleneck, student 모듈을 그대로 유지하면서도 추가적인 expert를 도입한 구조를 지닌다.
+
+각각 특징에 대해 정리해보면
+
+- **Teacher Encoder (T)**는 ImageNet으로 사전 학습된 WideResNet-50을 사용한다.
+- **Bottleneck**은 RD에서 제안된 One-Class Bottleneck Embedding (OCBE)을 동일하게 사용하며,  **Multi-scale Feature Fusion (MFF)** 모듈과 **One-Class Embedding (OCE)** 모듈로 구성된다.
+- **Student Decoder (S)**는 teacher와 대칭적인 네트워크 구조를 가지며, downsampling 대신 upsampling 연산을 수행한다. (즉 디코더 역할) 또한 student 내부에는 encoder 정보를 주입하기 위한 **Guided Information Injection (GII)** 모듈을 포함한다.
+- URD에서는 **Expert Network (E)**를 새롭게 도입하였는데, Expert는 teacher와 동일한 구조 및 초기 파라미터를 가지며, 정상(normal) 데이터만으로 학습된다.
+
+학습 과정에서 RD와 달리 teacher, bottleneck, student 모두 trainable이며, teacher는 독립적인 optimizer를 사용하고, bottleneck과 student는 동일한 optimizer를 공유한다. inference 때는 학습이 완료된 teacher와 student를 고정(frozen)하여 anomaly detection과 localization에 사용한다.
+
+---
+
+## Reverse Distillation with Expert
+
+RD는 teacher가 anomaly를 충분히 인식할 수 있고, 동시에 student가 anomaly-free feature를 생성할 수 있어야 한다고 전제하고 있다. 그러나 기존 RD 모델들은 이 두 조건을 동시에 만족하지 못하여 **miss detection 문제를 지니고 있다**. 이를 해결하기 위해 본 논문에서는 expert network를 도입하여 teacher와 student **모두를 동시에 distillation하도록 설계**하였다.
+
+- Teacher는 anomaly에 더욱 민감하도록 optimize되고, 정상과 비정상 feature를 명확히 구분할 수 있도록 학습된다.
+- Student는 denoising 방식을 그대로 사용하며, 입력이 anomalous sample이더라도 정상 feature를 재구성하도록 학습된다.
+
+이 dual-strategy distillation은 normal 영역에서는 teacher와 student feature가 유사하도록 하고, anomalous 영역에서는 불일치하도록 유도함으로써 anomaly detection 및 localization 성능을 향상시킨다.
+
+---
+
+## Anomaly Synthesis
+
+학습 시 각 정상 이미지 $I^n$에 대해, 대응되는 합성 anomaly 이미지 $I^a$를 생성한다. 이때 anomaly 합성은 **DRÆM**(Zavrtanik et al., 2021)을 따라 Perlin noise generator와 Describable Textures Dataset을 사용해서 anomaly image를 생성한다.
+
+Teacher $T$는 두 이미지 쌍 $I={I^n, I^a}$를 입력으로 받아 세 단계의 feature를 출력한다.
+
+$F_T^n = \{F_{T1}^n, F_{T2}^n, F_{T3}^n\} = T(I^n),
+\quad
+F_T^a = \{F_{T1}^a, F_{T2}^a, F_{T3}^a\} = T(I^a)$
+
+Student $S$는 teacher의 feature를 입력받아 대응되는 feature를 복원한다.
+
+$F_S^n = \{F_{S1}^n, F_{S2}^n, F_{S3}^n\} = S(F_T^n), 
+\quad
+F_S^a = \{F_{S1}^a, F_{S2}^a, F_{S3}^a\} = S(F_T^a)$
+
+Expert $E$는 정상 이미지만을 입력으로 받아 다음과 같은 feature를 생성한다.
+
+$F_E = \{F_{E1}^n, F_{E2}^n, F_{E3}^n\} = E(I^n)$
+
+---
+
+## Teacher Loss: Anomaly Sensitivity
+
+Teacher의 anomaly 감지 민감도를 향상시키기 위해, ground truth anomaly mask $M_{gt}$를 사용하여 feature extraction 과정을 가이드하는 역할을 한다. 정상 영역에서는 cosine similarity를 높게 유지하고(높을수록 비슷하다), anomaly 영역에서는 teacher의 abnormal feature와 expert의 normal feature 간 cosine distance를 증가(증가할수록 다르다)시킨다.
+
+각 위치 $(h, w)$에서 teacher와 expert 간 cosine distance는 다음과 같이 정의된다.
+
+$D_{TE}^{n/a, i}(h, w) = 1 - \frac{F_{Ti}^{n/a}(h, w) \cdot F_{Ei}^n(h, w)}{\|F_{Ti}^{n/a}(h, w)\|\|F_{Ei}^n(h, w)\|}$
+
+이를 바탕으로 teacher의 loss는 L1 distance 기반으로 계산된다.
+
+$L_{TE}^{n/a} = \sum_{i=1}^3 \Bigg\{ \frac{1}{H_i W_i} \sum_{h=1}^{H_i} \sum_{w=1}^{W_i} \big| D_{TE}^{n/a, i}(h, w) - M_{gt}^i(h, w)\big| \Bigg\}$
+
+최종 teacher loss는 정상과 이상 영역에 대한 합으로 정의된다.
+
+$L_{TE} = L_{TE}^n + L_{TE}^a$
+
+여기서 $H_i, W_i$는 i번째 블록 feature의 height와 width를 의미하며, $M_{gt}^i$는 feature 크기에 맞도록 downsampling된 anomaly mask이다.
+
+정상 영역(normal region)에서는 teacher와 expert가 모두 정상 feature를 보고 있으므로,
+
+- **teacher의 feature**와 **expert의 feature**는 매우 유사해야 함.
+- 즉, $\text{CosSim}(F_T^n, F_E^n)$ 값이 1에 가깝게 유지되도록 학습해야 함.
+
+→ 이 말은 **teacher도 정상 영역에서는 expert와 거의 같은 표현을 내도록 유도한다**는 의미 !
+
+이상 영역(anomalous region)에서는 teacher가 anomaly에 민감해야 함.
+
+- Expert는 normal image만으로 학습되었으므로 anomaly를 보지 못함 → anomaly가 들어와도 normal-like feature만 냄.
+- Teacher는 anomaly를 구분해야 하므로, anomaly 영역에서는 expert의 feature와 **달라져야 함**.
+- 따라서 $\text{CosDist}(F_T^a, F_E^n)$가 커지도록, 즉 $\text{CosSim}$ 값이 낮아지도록 학습해야 함.
+
+→ 이 말은 **teacher가 anomaly를 볼 때 expert와 달리 반응하여 feature 차이를 크게 만든다**는 의미.
+
+---
+
+## Student Loss: Feature Denoising
+
+Student는 teacher와 expert를 동시에 참조하여 정상 feature를 재구성하도록 학습된다. 즉, 정상/비정상 이미지가 입력되더라도 항상 정상 feature를 복원하는 것이 목표이다. 이를 위해 cosine similarity 기반의 loss를 설계하였다.
+
+먼저 flatten 연산 $F(\cdot)$를 적용하여 feature를 벡터화한다. (여기서 flatten 연산은 ReContrast 에서 제안된 flatten operation 이라고 한다.)
+
+### 여기서 왜 Flatten을 Student loss 연산에만 진행할까?
+
+- ReContrast에서도 이야기했지만, Flatten하면 각 이미지가 **하나의 embedding vector**로 간주되어, contrastive loss나 cosine similarity 계산이 더 간단해진다.
+- Student Loss도 같은 맥락에서 flatten feature를 사용해 **representation-level alignment**를 유도한다.
+- **즉, H,W 단위**로 cosine similarity를 계산하면 **local alignment (픽셀/patch 수준)**을 학습 → anomaly localization에 적합하지만,
+- **Flatten 후 벡터 단위**로 cosine similarity를 계산하면 **global alignment (전체 representation 수준)**을 학습 → Student가 항상 정상 feature를 복원하는 **representation-level denoising**에 적합하다.
+
+즉, student loss에서는 **pixel-wise error**가 아니라 **전체 feature 방향성**을 normal에 맞추는 게 중요하기 때문에 flatten을 적용하는 것 !
+
+$f = F(F)$
+
+이후 student feature와 teacher/expert feature 간 cosine similarity를 기반으로 loss를 계산한다.
+
+$L_{SE/ST}^i = \Big(1 - \frac{f_{Si}^n \cdot f_{E/T, i}^n}{\|f_{Si}^n\|\|f_{E/T, i}^n\|}\Big) 
++ \Big(1 - \frac{f_{Si}^a \cdot f_{E/T, i}^n}{\|f_{Si}^a\|\|f_{E/T, i}^n\|}\Big)$
+
+최종 student loss는 모든 layer에 대해 합산된다.
+
+$L_S = \sum_{i=1}^3 (L_{SE}^i + L_{ST}^i)$
+
+## Guided Information Injection (GII)
+
+**또한 URD에서는 추가적으로 Guided Information Injection (GII)** 모듈을 제안한다. GII는 위에 제시된 바와 같이 teacher encoder와 student decoder 사이에 위치하며, encoder에서 추출된 detail 정보를 decoder로 보다 정제된 방식으로 주입한다.
+
+이를 설계한 근거는 다음 두 가지 관찰에서 출발한다. 첫째, **higher-level feature는 texture와 같은 저차원 디테일 정보가 적기 때문에, 디테일한 reconstruction에 대한 중요성은 낮다.** 둘째, **higher-level feature는 decoder로 전달되는 경로가 짧아 상대적으로 recontruction quality가 우수하다.** 이러한 이유로, 그림(a) 에서 확인된 것처럼 high-level feature의 cosine similarity 기반 distance map은 anomaly localization에 효과적으로 활용될 수 있다.
+
+이러한 사실을 기반으로 제안한 GII는 high-level feature로부터 similarity-based attention을 계산하여 encoder feature가 decoder로 주입되는 비율을 조절한다. 이를 통해 reconstruction 과정에서 **(1) low-level detail 정보 부족 문제를 보완**하고, **(2) anomalous feature가 그대로 leakage 되는 문제를 억제**할 수 있다. 즉, 전통적인 skip connection이 무분별하게 low-level feature를 전달하는 방식과 달리, GII는 attention 기반 filtering을 통해 정상 정보 위주의 detail을 soft하게 주입한다.
+
+---
+
+### GII 모듈 구조
+
+GII는 student decoder의 두 블록 $S_1, S_2$ 앞에 삽입된다. $S_i$ 앞에 위치한 GII의 입력은 teacher encoder의 출력 feature $F_T^i$, $F_T^{i+1}$과 student decoder의 상위 블록 출력 feature $F_S^{i+1}$로 구성된다.
+
+과정을 하나하나 살펴보자.
+
+1. **Multi-scale Feature Fusion**
+    
+    먼저, $F_T^i$와 $F_T^{i+1}$는 채널 차원을 맞춘 뒤 결합하여 multi-scale fused feature를 얻는다.
+    
+    $F_{Tfusion}^{i+1} = \text{Fuse}$ 
+    
+2. **Cosine Similarity 계산**
+    
+    Teacher의 higher-level feature $F_T^{i+1}$과 Student의 대응 feature $F_S^{i+1}$ 간 cosine similarity를 계산한다.
+    
+    $Sim = \frac{F_T^{i+1} \cdot F_S^{i+1}}{\|F_T^{i+1}\| \, \|F_S^{i+1}\|}$
+    
+    여기서 $Sim$ 값이 작을수록 anomaly일 가능성이 높음을 의미한다.
+    
+3. **Attention 기반 정보 주입**
+    
+    $Sim$은 gating 역할을 하며, teacher encoder에서 전달되는 fused feature의 비율을 조절한다. 이를 통해 anomaly 영역에서의 불필요한 정보는 억제되고, 정상 detail만 주입된다. 결과적으로 detail-enriched feature $F_{SSA}^{i+1}$를 얻는다.
+    
+    $F_{SSA}^{i+1} = Sim \otimes F_{Tfusion}^{i+1}$
+    
+    ($\otimes$는 element-wise multiplication을 의미한다.)
+    
+4. **Decoder 입력 구성**
+    
+    Student decoder의 기존 feature $F_S^{i+1}$와 detail-enriched feature $F_{SSA}^{i+1}$를 concat하여 최종적으로 decoder block $S_i$에 전달한다.
+    
+    $F_S^i = S_i([F_S^{i+1}, F_{SSA}^{i+1}])$
+    
+
+이 과정을 통해 $S_i$는 보다 풍부하면서도 anomaly-free detail이 주입된 feature를 입력받아 정상 영역은 정밀하게 복원하고, anomaly 영역은 불일치하도록(normal해지도록) reconstruct한다.
+
+---
+
+### Inference 단계
+
+마지막으로 URD의 inference 과정을 확인해보자. 추론 시에는 학습 과정에서 사용된 expert network $E$가 제거되며, 이는 제안하는 방법이 **추가적인 저장 비용이나 연산량을 증가시키지 않음**을 의미한다.
+
+- **Anomaly Localization**
+    
+    Localization은 RD와 동일하게 진행된다. Teacher $T$와 Student $S$의 세 개 layer feature 간 cosine distance map을 계산하고, 이를 입력 이미지 크기로 upsampling한 뒤 합산하여 최종 score map을 얻는다.
+    
+    $ScoreMap = \sum_{i=1}^3 \Big( 1 - \frac{F_T^i \cdot F_S^i}{\|F_T^i\| \, \|F_S^i\|} \Big)$
+    
+- **Anomaly Detection**
+    
+    이미지 단위 anomaly score는 score map의 최대값으로 정의된다.
+    
+    $Score(I) = \max(ScoreMap(I))$
+    
+
+이를 통해 pixel-level anomaly localization과 image-level anomaly detection이 동시에 가능하다.

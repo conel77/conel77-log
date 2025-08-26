@@ -22,7 +22,7 @@ RD는 이를 완화하기 위해 Multi-level Feature Fusion(MFF) 구조를 제�
 
 즉, RD는 teacher와 student 간의 feature 차이를 기반으로 anomaly를 탐지하는 구조이지만, teacher가 **anomaly를 충분히 포착하지 못하거나 student가 anomaly-free feature 생성을 보장하지 못하는 상황**이 발생할 수 있다. 또한 MFF 기반 구조는 정상 영역에서도 reconstruction 차이를 유발하여 false positive를 증가시키는 한계를 가진다. 따라서 RD 기반 anomaly detection은 miss detection과 false positive 모두에 취약하며, 이를 해결하기 위해서는 teacher와 student의 feature 전달 및 처리 과정을 정교하게 설계하는 보완 모듈이 필요하게 됨을 지적하고 있다.
 
-![overall_method.png](/static/images/urd/overall_method.png)
+![overallmethod.png](/static/images/urd/overallmethod.png)
 
 위의 이미지와 같이 RD++ 방식으로 anomaly image를 만들어서 bottleneck 구조에서 student network가 anomaly-free한 feature만 reconstruct될 수 있도록 denoising 방식을 추가하거나, (c) 방식처럼 template guided라 하여 memory bank에 좋은 normal feature들을 저장하는 방식이 있지만 (b) 같은 경우는 normal pixel이 극소량이거나 receptive field에 normal한 정보가 대부분일 경우에는 abnormal한 영역에 대해 normal하게 만들 수 있다는 가정이 깨져버릴 수 있게 되며, (c) 같은 경우에는 메모리 소요, 연산량이 늘어나게된다.
 

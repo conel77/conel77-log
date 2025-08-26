@@ -22,18 +22,24 @@ RD는 이를 완화하기 위해 Multi-level Feature Fusion(MFF) 구조를 제�
 
 즉, RD는 teacher와 student 간의 feature 차이를 기반으로 anomaly를 탐지하는 구조이지만, teacher가 **anomaly를 충분히 포착하지 못하거나 student가 anomaly-free feature 생성을 보장하지 못하는 상황**이 발생할 수 있다. 또한 MFF 기반 구조는 정상 영역에서도 reconstruction 차이를 유발하여 false positive를 증가시키는 한계를 가진다. 따라서 RD 기반 anomaly detection은 miss detection과 false positive 모두에 취약하며, 이를 해결하기 위해서는 teacher와 student의 feature 전달 및 처리 과정을 정교하게 설계하는 보완 모듈이 필요하게 됨을 지적하고 있다.
 
+![overall_method.png](/static/images/urd/overall_method.png)
+
+위의 이미지와 같이 RD++ 방식으로 anomaly image를 만들어서 bottleneck 구조에서 student network가 anomaly-free한 feature만 reconstruct될 수 있도록 denoising 방식을 추가하거나, (c) 방식처럼 template guided라 하여 memory bank에 좋은 normal feature들을 저장하는 방식이 있지만 (b) 같은 경우는 normal pixel이 극소량이거나 receptive field에 normal한 정보가 대부분일 경우에는 abnormal한 영역에 대해 normal하게 만들 수 있다는 가정이 깨져버릴 수 있게 되며, (c) 같은 경우에는 메모리 소요, 연산량이 늘어나게된다.
+
 # Proposed Method
 
 ## Expert-Teacher-Student (E-T-S) Network
+
+![method.png](/static/images/urd/method.png)
 
 위의 아키텍처 그림과 같이, 본 논문에서 제안하는 전체 아키텍처는 RD의 teacher-student framework를 기반으로 하여 **Expert-Teacher-Student (E-T-S) Network**로 확장하였다. 이 구조는 RD의 teacher, bottleneck, student 모듈을 그대로 유지하면서도 추가적인 expert를 도입한 구조를 지닌다.
 
 각각 특징에 대해 정리해보면
 
-- **Teacher Encoder(T)**는 ImageNet으로 사전 학습된 WideResNet-50을 사용한다.
+- **Teacher Encoder (T)**는 ImageNet으로 사전 학습된 WideResNet-50을 사용한다.
 - **Bottleneck**은 RD에서 제안된 One-Class Bottleneck Embedding (OCBE)을 동일하게 사용하며,  **Multi-scale Feature Fusion(MFF)** 모듈과 **One-Class Embedding (OCE)** 모듈로 구성된다.
-- **Student Decoder(S)**는 teacher와 대칭적인 네트워크 구조를 가지며, downsampling 대신 upsampling 연산을 수행한다. (즉 디코더 역할) 또한 student 내부에는 encoder 정보를 주입하기 위한 **Guided Information Injection (GII)** 모듈을 포함한다.
-- URD에서는 **Expert Network(E)**를 새롭게 도입하였는데, Expert는 teacher와 동일한 구조 및 초기 파라미터를 가지며, 정상(normal) 데이터만으로 학습된다.
+- **Student Decoder (S)**는 teacher와 대칭적인 네트워크 구조를 가지며, downsampling 대신 upsampling 연산을 수행한다. (즉 디코더 역할) 또한 student 내부에는 encoder 정보를 주입하기 위한 **Guided Information Injection (GII)** 모듈을 포함한다.
+- URD에서는 **Expert Network (E)**를 새롭게 도입하였는데, Expert는 teacher와 동일한 구조 및 초기 파라미터를 가지며, 정상(normal) 데이터만으로 학습된다.
 
 학습 과정에서 RD와 달리 teacher, bottleneck, student 모두 trainable이며, teacher는 독립적인 optimizer를 사용하고, bottleneck과 student는 동일한 optimizer를 공유한다. inference 때는 학습이 완료된 teacher와 student를 고정(frozen)하여 anomaly detection과 localization에 사용한다.
 
@@ -52,7 +58,7 @@ RD는 teacher가 anomaly를 충분히 인식할 수 있고, 동시에 student가
 
 ## Anomaly Synthesis
 
-학습 시 각 정상 이미지 $I^n$에 대해, 대응되는 합성 anomaly 이미지 $I^a$를 생성한다. 이때 anomaly 합성은 **DRÆM**(Zavrtanik et al., 2021)을 따라 Perlin noise generator와 Describable Textures Dataset을 사용해서 anomaly image를 생성한다.
+학습 시 각 정상 이미지 $I^n$에 대해, 대응되는 합성 anomaly 이미지 $I^a$를 생성한다. 이때 anomaly 합성은 **DRÆM**(Zavrtanik et al., 2021)을 따라 Perlin noise generator와 Describable Textures Dataset을 사용해서 anomaly image를 생성한다. (아키텍처에서 파란색 동그리미 부분)
 
 Teacher $T$는 두 이미지 쌍 $I={I^n, I^a}$를 입력으로 받아 세 단계의 feature를 출력한다.
 
@@ -136,6 +142,8 @@ $$L_S = \sum_{i=1}^3 (L_{SE}^i + L_{ST}^i)$$
 
 ## Guided Information Injection (GII)
 
+![GII.png](/static/images/urd/GII.png)
+
 **또한 URD에서는 추가적으로 Guided Information Injection (GII)** 모듈을 제안한다. GII는 위에 제시된 바와 같이 teacher encoder와 student decoder 사이에 위치하며, encoder에서 추출된 detail 정보를 decoder로 보다 정제된 방식으로 주입한다.
 
 이를 설계한 근거는 다음 두 가지 관찰에서 출발한다. 첫째, **higher-level feature는 texture와 같은 저차원 디테일 정보가 적기 때문에, 디테일한 reconstruction에 대한 중요성은 낮다.** 둘째, **higher-level feature는 decoder로 전달되는 경로가 짧아 상대적으로 recontruction quality가 우수하다.** 이러한 이유로, 그림(a) 에서 확인된 것처럼 high-level feature의 cosine similarity 기반 distance map은 anomaly localization에 효과적으로 활용될 수 있다.
@@ -184,6 +192,8 @@ GII는 student decoder의 두 블록 $S_1, S_2$ 앞에 삽입된다. $S_i$ 앞�
 ---
 
 ### Inference 단계
+
+![inference.png](/static/images/urd/inference.png)
 
 마지막으로 URD의 inference 과정을 확인해보자. 추론 시에는 학습 과정에서 사용된 expert network $E$가 제거되며, 이는 제안하는 방법이 **추가적인 저장 비용이나 연산량을 증가시키지 않음**을 의미한다.
 

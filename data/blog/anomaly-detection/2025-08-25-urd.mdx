@@ -122,16 +122,16 @@ Student는 teacher와 expert를 동시에 참조하여 정상 feature를 재구�
 
 즉, student loss에서는 **pixel-wise error**가 아니라 **전체 feature 방향성**을 normal에 맞추는 게 중요하기 때문에 flatten을 적용하는 것 !
 
-$f = F(F)$
+$$f = F(F)$$
 
 이후 student feature와 teacher/expert feature 간 cosine similarity를 기반으로 loss를 계산한다.
 
-$L_{SE/ST}^i = \Big(1 - \frac{f_{Si}^n \cdot f_{E/T, i}^n}{\|f_{Si}^n\|\|f_{E/T, i}^n\|}\Big) 
-+ \Big(1 - \frac{f_{Si}^a \cdot f_{E/T, i}^n}{\|f_{Si}^a\|\|f_{E/T, i}^n\|}\Big)$
+$$L_{SE/ST}^i = \Big(1 - \frac{f_{Si}^n \cdot f_{E/T, i}^n}{\|f_{Si}^n\|\|f_{E/T, i}^n\|}\Big) 
++ \Big(1 - \frac{f_{Si}^a \cdot f_{E/T, i}^n}{\|f_{Si}^a\|\|f_{E/T, i}^n\|}\Big)$$
 
 최종 student loss는 모든 layer에 대해 합산된다.
 
-$L_S = \sum_{i=1}^3 (L_{SE}^i + L_{ST}^i)$
+$$L_S = \sum_{i=1}^3 (L_{SE}^i + L_{ST}^i)$$
 
 ## Guided Information Injection (GII)
 
@@ -153,13 +153,13 @@ GII는 student decoder의 두 블록 $S_1, S_2$ 앞에 삽입된다. $S_i$ 앞�
     
     먼저, $F_T^i$와 $F_T^{i+1}$는 채널 차원을 맞춘 뒤 결합하여 multi-scale fused feature를 얻는다.
     
-    $F_{Tfusion}^{i+1} = \text{Fuse}$ 
+    $$F_{Tfusion}^{i+1} = \text{Fuse}$$
     
 2. **Cosine Similarity 계산**
     
     Teacher의 higher-level feature $F_T^{i+1}$과 Student의 대응 feature $F_S^{i+1}$ 간 cosine similarity를 계산한다.
     
-    $Sim = \frac{F_T^{i+1} \cdot F_S^{i+1}}{\|F_T^{i+1}\| \, \|F_S^{i+1}\|}$
+    $$Sim = \frac{F_T^{i+1} \cdot F_S^{i+1}}{\|F_T^{i+1}\| \, \|F_S^{i+1}\|}$$
     
     여기서 $Sim$ 값이 작을수록 anomaly일 가능성이 높음을 의미한다.
     
@@ -167,7 +167,7 @@ GII는 student decoder의 두 블록 $S_1, S_2$ 앞에 삽입된다. $S_i$ 앞�
     
     $Sim$은 gating 역할을 하며, teacher encoder에서 전달되는 fused feature의 비율을 조절한다. 이를 통해 anomaly 영역에서의 불필요한 정보는 억제되고, 정상 detail만 주입된다. 결과적으로 detail-enriched feature $F_{SSA}^{i+1}$를 얻는다.
     
-    $F_{SSA}^{i+1} = Sim \otimes F_{Tfusion}^{i+1}$
+    $$F_{SSA}^{i+1} = Sim \otimes F_{Tfusion}^{i+1}$$
     
     ($\otimes$는 element-wise multiplication을 의미한다.)
     
@@ -175,7 +175,7 @@ GII는 student decoder의 두 블록 $S_1, S_2$ 앞에 삽입된다. $S_i$ 앞�
     
     Student decoder의 기존 feature $F_S^{i+1}$와 detail-enriched feature $F_{SSA}^{i+1}$를 concat하여 최종적으로 decoder block $S_i$에 전달한다.
     
-    $F_S^i = S_i([F_S^{i+1}, F_{SSA}^{i+1}])$
+    $$F_S^i = S_i([F_S^{i+1}, F_{SSA}^{i+1}])$$
     
 
 이 과정을 통해 $S_i$는 보다 풍부하면서도 anomaly-free detail이 주입된 feature를 입력받아 정상 영역은 정밀하게 복원하고, anomaly 영역은 불일치하도록(normal해지도록) reconstruct한다.
@@ -190,13 +190,13 @@ GII는 student decoder의 두 블록 $S_1, S_2$ 앞에 삽입된다. $S_i$ 앞�
     
     Localization은 RD와 동일하게 진행된다. Teacher $T$와 Student $S$의 세 개 layer feature 간 cosine distance map을 계산하고, 이를 입력 이미지 크기로 upsampling한 뒤 합산하여 최종 score map을 얻는다.
     
-    $ScoreMap = \sum_{i=1}^3 \Big( 1 - \frac{F_T^i \cdot F_S^i}{\|F_T^i\| \, \|F_S^i\|} \Big)$
+    $$ScoreMap = \sum_{i=1}^3 \Big( 1 - \frac{F_T^i \cdot F_S^i}{\|F_T^i\| \, \|F_S^i\|} \Big)$$
     
 - **Anomaly Detection**
     
     이미지 단위 anomaly score는 score map의 최대값으로 정의된다.
     
-    $Score(I) = \max(ScoreMap(I))$
+    $$Score(I) = \max(ScoreMap(I))$$
     
 
 이를 통해 pixel-level anomaly localization과 image-level anomaly detection이 동시에 가능하다.

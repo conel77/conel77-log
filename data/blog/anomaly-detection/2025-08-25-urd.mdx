@@ -30,10 +30,10 @@ RD는 이를 완화하기 위해 Multi-level Feature Fusion(MFF) 구조를 제�
 
 각각 특징에 대해 정리해보면
 
-- **Teacher Encoder (T)**는 ImageNet으로 사전 학습된 WideResNet-50을 사용한다.
-- **Bottleneck**은 RD에서 제안된 One-Class Bottleneck Embedding (OCBE)을 동일하게 사용하며,  **Multi-scale Feature Fusion (MFF)** 모듈과 **One-Class Embedding (OCE)** 모듈로 구성된다.
-- **Student Decoder (S)**는 teacher와 대칭적인 네트워크 구조를 가지며, downsampling 대신 upsampling 연산을 수행한다. (즉 디코더 역할) 또한 student 내부에는 encoder 정보를 주입하기 위한 **Guided Information Injection (GII)** 모듈을 포함한다.
-- URD에서는 **Expert Network (E)**를 새롭게 도입하였는데, Expert는 teacher와 동일한 구조 및 초기 파라미터를 가지며, 정상(normal) 데이터만으로 학습된다.
+- **Teacher Encoder(T)**는 ImageNet으로 사전 학습된 WideResNet-50을 사용한다.
+- **Bottleneck**은 RD에서 제안된 One-Class Bottleneck Embedding (OCBE)을 동일하게 사용하며,  **Multi-scale Feature Fusion(MFF)** 모듈과 **One-Class Embedding (OCE)** 모듈로 구성된다.
+- **Student Decoder(S)**는 teacher와 대칭적인 네트워크 구조를 가지며, downsampling 대신 upsampling 연산을 수행한다. (즉 디코더 역할) 또한 student 내부에는 encoder 정보를 주입하기 위한 **Guided Information Injection (GII)** 모듈을 포함한다.
+- URD에서는 **Expert Network(E)**를 새롭게 도입하였는데, Expert는 teacher와 동일한 구조 및 초기 파라미터를 가지며, 정상(normal) 데이터만으로 학습된다.
 
 학습 과정에서 RD와 달리 teacher, bottleneck, student 모두 trainable이며, teacher는 독립적인 optimizer를 사용하고, bottleneck과 student는 동일한 optimizer를 공유한다. inference 때는 학습이 완료된 teacher와 student를 고정(frozen)하여 anomaly detection과 localization에 사용한다.
 
@@ -126,8 +126,9 @@ $$f = F(F)$$
 
 이후 student feature와 teacher/expert feature 간 cosine similarity를 기반으로 loss를 계산한다.
 
-$$L_{SE/ST}^i = \Big(1 - \frac{f_{Si}^n \cdot f_{E/T, i}^n}{\|f_{Si}^n\|\|f_{E/T, i}^n\|}\Big) 
-+ \Big(1 - \frac{f_{Si}^a \cdot f_{E/T, i}^n}{\|f_{Si}^a\|\|f_{E/T, i}^n\|}\Big)$$
+$$
+L_{SE/ST}^i = \Big(1 - \frac{f_{Si}^n \cdot f_{E/T, i}^n}{\|f_{Si}^n\|\|f_{E/T, i}^n\|}\Big) + \Big(1 - \frac{f_{Si}^a \cdot f_{E/T, i}^n}{\|f_{Si}^a\|\|f_{E/T, i}^n\|}\Big)
+$$
 
 최종 student loss는 모든 layer에 대해 합산된다.
 
